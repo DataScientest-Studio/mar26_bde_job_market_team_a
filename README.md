@@ -22,9 +22,6 @@ Pour le dev local, je ne passe pas par Snowflake pour eviter de consommer des cr
 - dedup inter-source apres normalisation
 - conservation de la tracabilite des sources
 
-Schema rapide :
-
-- [docs/job_market_pipeline_flow.png](docs/job_market_pipeline_flow.png)
 
 ## Collecte
 
