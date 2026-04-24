@@ -180,16 +180,16 @@ parsed_values as (
         salary_raw,
         case
             when salary_range_match is not null
-                then regexp_replace(replace(replace(salary_range_match[1], ' ', ''), ',', '.'), '[^0-9.]', '', 'g')::numeric
+                then {{ parse_numeric_text('salary_range_match[1]') }}
             when salary_single_match is not null
-                then regexp_replace(replace(replace(salary_single_match[1], ' ', ''), ',', '.'), '[^0-9.]', '', 'g')::numeric
+                then {{ parse_numeric_text('salary_single_match[1]') }}
             else null
         end as salary_min_norm,
         case
             when salary_range_match is not null
-                then regexp_replace(replace(replace(salary_range_match[2], ' ', ''), ',', '.'), '[^0-9.]', '', 'g')::numeric
+                then {{ parse_numeric_text('salary_range_match[2]') }}
             when salary_single_match is not null
-                then regexp_replace(replace(replace(salary_single_match[1], ' ', ''), ',', '.'), '[^0-9.]', '', 'g')::numeric
+                then {{ parse_numeric_text('salary_single_match[1]') }}
             else null
         end as salary_max_norm,
         salary_frequency_norm,

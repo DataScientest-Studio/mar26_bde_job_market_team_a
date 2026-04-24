@@ -76,6 +76,38 @@ nullif(
 )
 {%- endmacro %}
 
+{% macro clean_city_label(expression) -%}
+nullif(
+    trim(
+        regexp_replace(
+            regexp_replace(
+                coalesce({{ expression }}, ''),
+                '^\s*[0-9]{2,3}\s*-\s*',
+                ''
+            ),
+            '^\s*[0-9]{5}\s+',
+            ''
+        )
+    ),
+    ''
+)
+{%- endmacro %}
+
+{% macro extract_postal_code(postal_code_expression, city_expression) -%}
+coalesce(
+    nullif(trim({{ postal_code_expression }}), ''),
+    case
+        when coalesce({{ city_expression }}, '') ~ '^\s*[0-9]{5}\s+'
+            then substring(coalesce({{ city_expression }}, '') from '^\s*([0-9]{5})')
+        else null
+    end
+)
+{%- endmacro %}
+
+{% macro normalize_city_text(expression) -%}
+{{ normalize_match_text(clean_city_label(expression)) }}
+{%- endmacro %}
+
 {% macro normalize_city_match(expression) -%}
 nullif(
     trim(
@@ -85,7 +117,7 @@ nullif(
                     regexp_replace(
                         regexp_replace(
                             regexp_replace(
-                                coalesce({{ normalize_match_text(expression) }}, ''),
+                                coalesce({{ normalize_city_text(expression) }}, ''),
                                 '(^[0-9]{5}\s+)|((\s+)?\(?[0-9]{2,5}\)?)$',
                                 '',
                                 'g'

@@ -79,11 +79,11 @@ prepared as (
         {{ normalize_match_text('company_raw') }} as company_norm,
         {{ normalize_company_match('company_raw') }} as company_match_norm,
         city_raw,
-        {{ normalize_match_text('city_raw') }} as city_norm,
+        {{ normalize_city_text('city_raw') }} as city_norm,
         {{ normalize_city_match('city_raw') }} as city_match_norm,
         null::text as region_norm,
         'france' as country_norm,
-        postal_code_raw as postal_code,
+        {{ extract_postal_code('postal_code_raw', 'city_raw') }} as postal_code,
         contract_type_raw,
         {{ normalize_match_text('contract_type_raw') }} as contract_type_norm,
         case
@@ -96,6 +96,7 @@ prepared as (
         null::numeric as salary_max_norm,
         null::text as salary_frequency_norm,
         published_at as published_at_norm,
+        coalesce(published_at::date, ingested_at::date) as match_reference_date,
         updated_at,
         description_raw,
         {{ normalize_match_text('description_raw') }} as description_norm,
@@ -108,12 +109,7 @@ prepared as (
         current_timestamp as created_at
     from unioned
 ),
-/* 
-=> construit 3 niveaux de fingerprint :
-- fingerprint_exact : title + company + city + date
-- fingerprint_soft: title + company + city
-- fingerprint_title_city: title + city
-*/
+/* construit le fingerprint utilise pour le matching inter-source */
 final as (
     select
         *,
@@ -121,7 +117,7 @@ final as (
             when title_match_norm is not null
                 and company_match_norm is not null
                 and city_match_norm is not null
-                and published_at_norm is not null
+                and match_reference_date is not null
                 then md5(
                     title_match_norm
                     || '|'
@@ -129,29 +125,10 @@ final as (
                     || '|'
                     || city_match_norm
                     || '|'
-                    || to_char(published_at_norm::date, 'YYYY-MM-DD')
+                    || to_char(match_reference_date, 'YYYY-MM')
                 )
             else null
-        end as fingerprint_exact,
-        case
-            when title_match_norm is not null
-                and company_match_norm is not null
-                and city_match_norm is not null
-                then md5(
-                    title_match_norm
-                    || '|'
-                    || company_match_norm
-                    || '|'
-                    || city_match_norm
-                )
-            else null
-        end as fingerprint_soft,
-        case
-            when title_match_norm is not null
-                and city_match_norm is not null
-                then md5(title_match_norm || '|' || city_match_norm)
-            else null
-        end as fingerprint_title_city
+        end as fingerprint_exact
     from prepared
 )
 

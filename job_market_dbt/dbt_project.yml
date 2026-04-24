@@ -16,8 +16,8 @@ clean-targets:
 models:
   job_market_dbt:
     staging:
-      +materialized: view
+      +materialized: ephemeral
     intermediate:
-      +materialized: table
+      +materialized: ephemeral
     marts:
       +materialized: table

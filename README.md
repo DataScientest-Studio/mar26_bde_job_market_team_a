@@ -1,75 +1,70 @@
 # Job Market
 
-Petit projet de pipeline data autour des offres d'emploi.
+Job Market est un projet data autour des offres d'emploi.
 
-L'idee est simple :
+Nous partons de plusieurs sources d'offres, nous conservons le brut pour la tracabilite, puis nous construisons avec dbt une base analytique dedoublonnee et exploitable pour la suite produit.
 
-- recuperer des offres depuis France Travail et Indeed
-- garder le brut en local
-- charger le brut dans PostgreSQL
-- transformer les donnees avec dbt
-- obtenir une table finale propre pour l'analyse et la suite ML
+Les sources ciblees sont :
 
-Pour le dev local, je ne passe pas par Snowflake pour eviter de consommer des credits.
+- France Travail
+- Welcome to the Jungle
 
-## Ce qu'il y a aujourd'hui
+La base finale doit servir a :
 
-- collecte France Travail via API
-- collecte Indeed via Selenium + BeautifulSoup
-- stockage du brut dans `data/raw`
-- chargement dans PostgreSQL local
-- transformations dbt
-- dedup inter-source apres normalisation
-- conservation de la tracabilite des sources
+- analyser le marche de l'emploi
+- alimenter un dashboard Streamlit
+- preparer une API de recommandation d'offres
+- preparer une API de prediction de salaire
+- exposer des tables propres dans Supabase
 
+## Pipeline
+
+Le pipeline suit ce flux :
+
+1. collecte des offres en Python
+2. stockage du brut en local
+3. chargement des JSON dans PostgreSQL
+4. transformations SQL avec dbt
+5. production de tables analytics propres
+
+## Stack
+
+- collecte : Python
+- sources : API France Travail, Welcome to the Jungle
+- base de developpement : PostgreSQL
+- transformations : dbt SQL
+- base cible : Supabase PostgreSQL
+- visualisation : Streamlit
+- couche produit a venir : API metier
 
 ## Collecte
-
-### France Travail
-
-Le collecteur est ici :
-
-- [src/data/connectors/france_travail.py](src/data/connectors/france_travail.py)
-
-La collecte est pilotee depuis :
-
-- [references/collection_targets.yml](references/collection_targets.yml)
-
-Je passe par `codeROME` + geographie pour avoir quelque chose de plus stable qu'une simple recherche texte.
-
-### Indeed
-
-Le collecteur est ici :
-
-- [src/data/connectors/indeed.py](src/data/connectors/indeed.py)
-
-Pour Indeed, je reste sur des recherches texte, mais elles sont alignees sur le meme referentiel metier que France Travail.
 
 Le script principal de collecte est :
 
 - [src/data/make_dataset.py](src/data/make_dataset.py)
 
+Les connecteurs sont ici :
+
+- [src/data/connectors/france_travail.py](src/data/connectors/france_travail.py)
+- `src/data/connectors/welcome_to_the_jungle.py`
+
+Le referentiel de collecte est ici :
+
+- [references/collection_targets.yml](references/collection_targets.yml)
+
+
 ## Stockage
 
-Le brut est garde ici :
+Le brut est garde dans :
 
 - `data/raw/france_travail`
-- `data/raw/indeed`
+- `data/raw/welcome_to_the_jungle`
 
-Puis je charge dans PostgreSQL avec :
+Le chargement vers PostgreSQL est gere ici :
 
 - [src/data/normalizers/load_raw_to_postgres.py](src/data/normalizers/load_raw_to_postgres.py)
 
-Les tables raw sont :
-
-- `landing.raw_france_travail_offers`
-- `landing.raw_indeed_offers`
-
-Important :
-
-- aucune dedup en raw
-- une ligne = une offre source
-- je garde les infos de source pour pouvoir relier une offre finale a ses sources d'origine
+Le raw reste volontairement non dedoublonne. Une ligne raw represente une offre source telle qu'elle a ete collectee.
 
 ## dbt
 
@@ -77,105 +72,84 @@ Le projet dbt est ici :
 
 - [job_market_dbt](job_market_dbt)
 
-Les modeles principaux :
+Les couches `staging` et `intermediate` sont materialisees en `ephemeral`. Elles structurent le SQL dans dbt, mais ne creent pas de tables techniques en base.
 
-- `stg_france_travail_offers`
-- `stg_indeed_offers`
-- `int_job_offers_normalized`
-- `int_job_offer_matches`
-- `int_primary_job_offers`
-- `fct_job_offers`
-- `bridge_job_source`
+Seules les tables finales `marts` sont materialisees dans le schema `analytics`.
 
-## Dedup
+Tables finales principales :
 
-Je ne fusionne pas les sources trop tot.
+- `analytics.fct_job_offers` : offres canoniques dedoublonnees
+- `analytics.bridge_job_source` : tracabilite entre offres finales et offres source
+- `analytics.dim_company`
+- `analytics.dim_location`
+- `analytics.dim_contract`
+- `analytics.dim_job_type`
+- `analytics.dim_industry`
+- `analytics.dim_salary`
+- `analytics.dim_education`
+- `analytics.dim_skill`
+- `analytics.dim_advantage`
+- `analytics.bridge_job_skill`
+- `analytics.bridge_job_advantage`
 
-Le flux est :
+## Deduplication
 
-1. raw dans `landing`
-2. staging pour extraire les champs utiles
-3. normalisation des titres / entreprises / villes
-4. matching inter-source
-5. offre canonique finale
+La deduplication se fait apres normalisation, avec un fingerprint de matching construit a partir de :
 
-La dedup se fait surtout dans :
+- titre normalise
+- entreprise normalisee
+- ville normalisee
+- annee/mois de publication
 
-- [job_market_dbt/models/intermediate/int_job_offers_normalized.sql](job_market_dbt/models/intermediate/int_job_offers_normalized.sql)
-- [job_market_dbt/models/intermediate/int_job_offer_matches.sql](job_market_dbt/models/intermediate/int_job_offer_matches.sql)
+Si la date de publication est absente, nous utilisons la date d'ingestion comme date de reference de matching.
 
-Aujourd'hui, je garde surtout deux niveaux utiles :
+Deux offres issues de sources differentes peuvent etre rapprochees seulement si leurs dates de reference sont dans une fenetre de 30 jours glissants.
 
-- `fingerprint_exact`
-- `fingerprint_soft`
-
-Si une offre France Travail et une offre Indeed matchent, France Travail est prioritaire comme source primaire.
-
-## Tables finales
-
-La table principale pour l'analyse est :
-
-- `analytics.fct_job_offers`
-
-La table de tracabilite est :
-
-- `analytics.bridge_job_source`
-
-J'ai aussi une couche dimensions / bridges pour preparer la suite :
-
-- `dim_company`
-- `dim_location`
-- `dim_contract`
-- `dim_job_type`
-- `dim_industry`
-- `dim_salary`
-- `dim_education`
-- `dim_skill`
-- `dim_advantage`
-- `bridge_job_skill`
-- `bridge_job_advantage`
+Quand deux sources matchent, France Travail reste prioritaire comme source primaire.
 
 ## Lancer le projet en local
 
-### Installer les dependances
+Installer les dependances :
 
-```powershell
+```
 python -m pip install -r requirements.txt
 ```
 
-### Lancer Postgres et pgAdmin
+Lancer PostgreSQL et pgAdmin :
 
-```powershell
+```
 docker compose up -d postgres pgadmin
 ```
 
-### Collecter le brut
+Collecter le brut :
 
-```powershell
+```
 python src\data\make_dataset.py --source france_travail
-python src\data\make_dataset.py --source indeed
+python src\data\make_dataset.py --source welcome_to_the_jungle
 ```
 
-### Charger dans Postgres
+Charger le raw dans PostgreSQL :
 
-```powershell
+```
 python src\data\normalizers\load_raw_to_postgres.py --source all
 ```
 
-### Lancer dbt
+Lancer dbt :
 
-```powershell
-dbt run --project-dir job_market_dbt --profiles-dir job_market_dbt
-dbt test --project-dir job_market_dbt --profiles-dir job_market_dbt
+```
+python scripts\run_dbt.py run
+python scripts\run_dbt.py test
 ```
 
-## Variables utiles
+Le script `scripts/run_dbt.py` charge automatiquement le fichier `.env` avant d'executer dbt.
 
-Exemple :
+## Configuration
+
+Exemple de configuration :
 
 - [.env.example](.env.example)
 
-Les plus importantes :
+Variables principales :
 
 - `FRANCE_TRAVAIL_CLIENT_ID`
 - `FRANCE_TRAVAIL_CLIENT_SECRET`
@@ -184,8 +158,19 @@ Les plus importantes :
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
+- `DBT_TARGET`
+- `DBT_DEV_SCHEMA`
+- `SUPABASE_DB_HOST`
+- `SUPABASE_DB_PORT`
+- `SUPABASE_DB_NAME`
+- `SUPABASE_DB_USER`
+- `SUPABASE_DB_PASSWORD`
+- `SUPABASE_DB_SCHEMA`
 - `PGADMIN_DEFAULT_EMAIL`
 - `PGADMIN_DEFAULT_PASSWORD`
 - `PGADMIN_PORT`
 - `SELENIUM_HEADLESS`
 
+`DBT_TARGET=dev` pointe vers PostgreSQL local.
+
+`DBT_TARGET=prod` pointe vers Supabase

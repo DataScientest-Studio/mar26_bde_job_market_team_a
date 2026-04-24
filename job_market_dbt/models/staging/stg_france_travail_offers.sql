@@ -17,16 +17,7 @@ renamed as (
         raw_payload ->> 'intitule' as title_raw,
         raw_payload ->> 'description' as description_raw,
         raw_payload #>> '{entreprise,nom}' as company_raw,
-        nullif(
-            trim(
-                regexp_replace(
-                    coalesce(raw_payload #>> '{lieuTravail,libelle}', ''),
-                    '^[0-9]{2,3}\s*-\s*',
-                    ''
-                )
-            ),
-            ''
-        ) as city_raw,
+        {{ clean_city_label("raw_payload #>> '{lieuTravail,libelle}'") }} as city_raw,
         raw_payload #>> '{lieuTravail,codePostal}' as postal_code_raw,
         raw_payload #>> '{lieuTravail,commune}' as commune_code_raw,
         raw_payload ->> 'typeContratLibelle' as contract_type_raw,
