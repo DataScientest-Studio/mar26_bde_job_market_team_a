@@ -1,7 +1,6 @@
 PYTHON := .venv/Scripts/python.exe
 PIP := $(PYTHON) -m pip
-DBT := .venv/Scripts/dbt.exe
-DBT_FLAGS := --project-dir job_market_dbt --profiles-dir job_market_dbt
+DBT := $(PYTHON) scripts/run_dbt.py
 LOADER := src/data/normalizers/load_raw_to_postgres.py
 COLLECTOR := src/data/make_dataset.py
 
@@ -43,9 +42,9 @@ load-raw:
 	$(PYTHON) $(LOADER) --source all
 
 dbt-run:
-	$(DBT) run $(DBT_FLAGS)
+	$(DBT) run
 
 dbt-test:
-	$(DBT) test $(DBT_FLAGS)
+	$(DBT) test
 
 pipeline: collect-france-travail collect-indeed load-raw dbt-run dbt-test
