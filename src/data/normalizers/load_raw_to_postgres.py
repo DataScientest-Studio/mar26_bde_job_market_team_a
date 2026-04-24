@@ -15,16 +15,40 @@ load_dotenv()
 
 
 DATA_DIR = Path("data/raw")
+INIT_SQL_PATH = Path("models/create_postgredb.sql")
 FRANCE_TRAVAIL_URL = "https://candidat.francetravail.fr/offres/recherche/detail/{offer_id}"
 
 
 def build_connection_string() -> str:
+    target = os.getenv("DBT_TARGET", "dev")
+    print(f"TARGET: {target}")
+
+    if target == "prod":
+        host = os.getenv("SUPABASE_DB_HOST", "")
+        port = os.getenv("SUPABASE_DB_PORT", "5432")
+        dbname = os.getenv("SUPABASE_DB_NAME", "postgres")
+        user = os.getenv("SUPABASE_DB_USER", "postgres")
+        password = os.getenv("SUPABASE_DB_PASSWORD", "")
+        sslmode = "require"
+        return (
+            f"host={host} port={port} dbname={dbname} "
+            f"user={user} password={password} sslmode={sslmode}"
+        )
+
     host = os.getenv("POSTGRES_HOST", "localhost")
     port = os.getenv("POSTGRES_PORT", "5432")
     dbname = os.getenv("POSTGRES_DB", "job_market")
     user = os.getenv("POSTGRES_USER", "job_market")
     password = os.getenv("POSTGRES_PASSWORD", "job_market")
     return f"host={host} port={port} dbname={dbname} user={user} password={password}"
+
+
+def ensure_landing_tables(conn) -> None:
+    init_sql = INIT_SQL_PATH.read_text(encoding="utf-8")
+
+    with conn.cursor() as cur:
+        cur.execute(init_sql)
+    conn.commit()
 
 
 def build_raw_hash(payload: dict) -> str:
@@ -92,7 +116,7 @@ def extract_indeed_records(file_path: Path) -> list[dict]:
     return records
 
 
-def insert_records(table_name: str, records: list[dict]) -> int:
+def insert_records(conn, table_name: str, records: list[dict]) -> int:
     if not records:
         return 0
 
@@ -122,32 +146,31 @@ def insert_records(table_name: str, records: list[dict]) -> int:
         for record in records
     ]
 
-    with connect(build_connection_string()) as conn:
-        with conn.cursor() as cur:
-            cur.executemany(insert_sql, prepared_records)
-        conn.commit()
+    with conn.cursor() as cur:
+        cur.executemany(insert_sql, prepared_records)
+    conn.commit()
 
     return len(records)
 
 
-def load_france_travail() -> int:
+def load_france_travail(conn) -> int:
     total_inserted = 0
 
     for file_path in iter_json_files("france_travail"):
         records = extract_france_travail_records(file_path)
-        inserted = insert_records("raw_france_travail_offers", records)
+        inserted = insert_records(conn, "raw_france_travail_offers", records)
         total_inserted += inserted
         print(f"[france_travail] {file_path.name}: {inserted} offres chargees")
 
     return total_inserted
 
 
-def load_indeed() -> int:
+def load_indeed(conn) -> int:
     total_inserted = 0
 
     for file_path in iter_json_files("indeed"):
         records = extract_indeed_records(file_path)
-        inserted = insert_records("raw_indeed_offers", records)
+        inserted = insert_records(conn, "raw_indeed_offers", records)
         total_inserted += inserted
         print(f"[indeed] {file_path.name}: {inserted} offres chargees")
 
@@ -169,11 +192,14 @@ def main() -> None:
     args = parse_args()
     total_inserted = 0
 
-    if args.source in {"all", "france_travail"}:
-        total_inserted += load_france_travail()
+    with connect(build_connection_string()) as conn:
+        ensure_landing_tables(conn)
 
-    if args.source in {"all", "indeed"}:
-        total_inserted += load_indeed()
+        if args.source in {"all", "france_travail"}:
+            total_inserted += load_france_travail(conn)
+
+        if args.source in {"all", "indeed"}:
+            total_inserted += load_indeed(conn)
 
     print(f"Total inserted rows: {total_inserted}")
 
