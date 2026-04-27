@@ -114,7 +114,7 @@ def find_top_skills(limit=50):
     # For demonstration purposes, using a sample list of skills
     return ["python", "sql", "airflow", "aws", "docker", "kubernetes", "spark", "hadoop", "scala", "java"]
 
-def prepare_features():
+def retrieve_features():
     query = """
         SELECT jo.job_id, jo.experience_years, (ds.salary_max+ds.salary_min)/2 AS avg_salary, array_agg(ds.skill_name) AS skills
         FROM job_offers jo
@@ -140,7 +140,7 @@ def prepare_features():
     ]
     return pd.DataFrame(jobs)
 
-
+import joblib
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
@@ -149,11 +149,23 @@ from sklearn.cluster import KMeans
 # -----------------------
 # Load data
 # -----------------------
-df = prepare_features()
+df = retrieve_features()
 
 # -----------------------
 # 1. Skills encoding (multi-hot)
 # -----------------------
+
+# Limit skill vocabulary
+# Before MultiLabelBinarizer:
+
+top_skills = find_top_skills(limit=30)
+df["skills"] = df["skills"].apply(lambda s: [x for x in s if x in top_skills])
+
+# Avoid empty vectors
+# If job has no skills after filtering:
+
+df["skills"] = df["skills"].apply(lambda s: s if len(s) > 0 else ["other"])
+
 mlb = MultiLabelBinarizer()
 skills_encoded = mlb.fit_transform(df["skills"])
 
@@ -251,19 +263,6 @@ def get_candidate_jobs(
 
     return candidates
 
-
-# Limit skill vocabulary
-# Before MultiLabelBinarizer:
-
-top_skills = find_top_skills(limit=30)
-df["skills"] = df["skills"].apply(lambda s: [x for x in s if x in top_skills])
-
-# Avoid empty vectors
-# If job has no skills after filtering:
-
-df["skills"] = df["skills"].apply(lambda s: s if len(s) > 0 else ["other"])
-
-import joblib
 
 joblib.dump(kmeans, "kmeans.pkl")
 joblib.dump(scaler, "scaler.pkl")
