@@ -11,11 +11,31 @@ def load_collection_targets(yaml_path: str) -> list[dict]:
     return content.get("targets", [])
 
 
-def build_indeed_searches(targets: list[dict]) -> list[dict]:
+# def build_indeed_searches(targets: list[dict]) -> list[dict]:
+#     searches: list[dict] = []
+
+#     for target in targets:
+#         for search in target.get("indeed_searches", []):
+#             searches.append(
+#                 {
+#                     "sector_slug": target.get("sector_slug"),
+#                     "sector_label": target.get("sector_label"),
+#                     "rome_family": target.get("rome_family"),
+#                     "rome_codes": target.get("rome_codes", []),
+#                     "regions": target.get("regions", []),
+#                     "departements": target.get("departements", []),
+#                     "query": search.get("query", ""),
+#                     "location": search.get("location", ""),
+#                 }
+#             )
+
+#     return searches
+
+def build_welcome_searches(targets: list[dict]) -> list[dict]:
     searches: list[dict] = []
 
     for target in targets:
-        for search in target.get("indeed_searches", []):
+        for search in target.get("welcome_searches", []):
             searches.append(
                 {
                     "sector_slug": target.get("sector_slug"),
@@ -30,7 +50,6 @@ def build_indeed_searches(targets: list[dict]) -> list[dict]:
             )
 
     return searches
-
 
 def build_france_travail_targets(targets: list[dict]) -> list[dict]:
     france_travail_targets: list[dict] = []

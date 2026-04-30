@@ -1,0 +1,14 @@
+search_page:  
+  job_title: a[href^='/fr/companies/'] h2
+  job_page_link: 
+
+job_page:
+  job_title_class: sc-TezEC.iVXHnU.wui-text
+  job_tags_class: sc-brzPDJ.fCRYmq
+  job_sub_tags_class: sc-fibHhp.iyXUgN
+  description_class: sc-dbdiey.eUMFCI
+  company_name_class: sc-TezEC.kuLxbv.wui-text
+  company_tags_class: sc-brzPDJ.cJytbT
+  company_sub_tag_class: sc-fibHhp.bEeOd
+  skills_class: sc-fibHhp.tzBwn
+  publication_date_class: sc-TezEC.knXhsH.wui-text
