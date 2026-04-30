@@ -22,7 +22,10 @@ renamed as (
         raw_payload #>> '{lieuTravail,commune}' as commune_code_raw,
         raw_payload ->> 'typeContratLibelle' as contract_type_raw,
         raw_payload ->> 'natureContrat' as contract_nature_raw,
-        raw_payload #>> '{salaire,commentaire}' as salary_raw,
+        coalesce(
+            nullif(raw_payload #>> '{salaire,libelle}', ''),
+            nullif(raw_payload #>> '{salaire,commentaire}', '')
+        ) as salary_raw,
         nullif(raw_payload ->> 'dateCreation', '')::timestamptz as published_at,
         nullif(raw_payload ->> 'dateActualisation', '')::timestamptz as updated_at,
         raw_payload ->> 'dureeTravailLibelleConverti' as working_time_raw,

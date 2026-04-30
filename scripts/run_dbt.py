@@ -5,21 +5,26 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(repo_root))
+
+    from src.database import load_project_env
+
     env_file = repo_root / ".env"
 
-    if env_file.exists():
-        load_dotenv(env_file, override=True)
+    load_project_env(env_file, override=True)
     project_dir = repo_root / "job_market_dbt"
+    dbt_args = sys.argv[1:]
 
+    if dbt_args in (["--version"], ["-v"]):
+        completed = subprocess.run(["dbt", *dbt_args], env=os.environ.copy())
+        return completed.returncode
 
     command = [
-       "dbt",
-        *sys.argv[1:],
+        "dbt",
+        *dbt_args,
         "--project-dir",
         str(project_dir),
         "--profiles-dir",
