@@ -81,9 +81,9 @@ prepared as (
         city_raw,
         {{ normalize_city_text('city_raw') }} as city_norm,
         {{ normalize_city_match('city_raw') }} as city_match_norm,
-        null::text as region_norm,
-        'france' as country_norm,
         {{ extract_postal_code('postal_code_raw', 'city_raw') }} as postal_code,
+        {{ postal_code_to_region(extract_postal_code('postal_code_raw', 'city_raw')) }} as region_norm,
+        'france' as country_norm,
         contract_type_raw,
         {{ normalize_match_text('contract_type_raw') }} as contract_type_norm,
         case

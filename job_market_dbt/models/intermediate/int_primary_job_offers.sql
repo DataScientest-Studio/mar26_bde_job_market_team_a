@@ -132,14 +132,25 @@ derived as (
             else null
         end as salary_currency,
         case
-            when lower(coalesce(salary_raw, '')) ~ '\b(an|annuel|year)\b' then 'year'
             when lower(coalesce(salary_raw, '')) ~ '\b(mois|mensuel|month)\b' then 'month'
-            when lower(coalesce(salary_raw, '')) ~ '\b(semaine|week)\b' then 'week'
+            when lower(coalesce(salary_raw, '')) ~ '\b(an|annuel|annuelle|year)\b' then 'year'
             when lower(coalesce(salary_raw, '')) ~ '(/h|\bheure\b|\bhoraire\b)' then 'hour'
+            when lower(coalesce(salary_raw, '')) ~ '\b(semaine|week)\b' then 'week'
             else null
         end as salary_frequency_norm,
-        regexp_match(coalesce(salary_raw, ''), '([0-9][0-9\s,\.]*)\D+([0-9][0-9\s,\.]*)') as salary_range_match,
-        regexp_match(coalesce(salary_raw, ''), '([0-9][0-9\s,\.]*)') as salary_single_match,
+        case
+            when lower(coalesce(salary_raw, '')) ~ '(^|[^a-z0-9])k([^a-z0-9]|$)|\bk\s*(eur|euros)\b'
+                then 1000
+            else 1
+        end as salary_unit_multiplier,
+        regexp_match(
+            lower(coalesce(salary_raw, '')),
+            '([0-9]+(\s?[0-9]{3})*([,.][0-9]+)?)\s*(k|eur|euros)?[^0-9,.]+([0-9]+(\s?[0-9]{3})*([,.][0-9]+)?)\s*(k|eur|euros)'
+        ) as salary_range_match,
+        regexp_match(
+            lower(coalesce(salary_raw, '')),
+            '([0-9]+(\s?[0-9]{3})*([,.][0-9]+)?)\s*(k|eur|euros)'
+        ) as salary_single_match,
         regexp_match(lower(coalesce(experience_raw, '')), '([0-9]+(?:[.,][0-9]+)?)') as experience_match
     from base
 ),
@@ -180,16 +191,16 @@ parsed_values as (
         salary_raw,
         case
             when salary_range_match is not null
-                then {{ parse_numeric_text('salary_range_match[1]') }}
+                then {{ parse_numeric_text('salary_range_match[1]') }} * salary_unit_multiplier
             when salary_single_match is not null
-                then {{ parse_numeric_text('salary_single_match[1]') }}
+                then {{ parse_numeric_text('salary_single_match[1]') }} * salary_unit_multiplier
             else null
         end as salary_min_norm,
         case
             when salary_range_match is not null
-                then {{ parse_numeric_text('salary_range_match[2]') }}
+                then {{ parse_numeric_text('salary_range_match[5]') }} * salary_unit_multiplier
             when salary_single_match is not null
-                then {{ parse_numeric_text('salary_single_match[1]') }}
+                then {{ parse_numeric_text('salary_single_match[1]') }} * salary_unit_multiplier
             else null
         end as salary_max_norm,
         salary_frequency_norm,
