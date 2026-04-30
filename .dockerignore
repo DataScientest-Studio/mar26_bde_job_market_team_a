@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+logs
+reports
+notebooks
+job_market_dbt/target
+job_market_dbt/logs
