@@ -13,7 +13,7 @@ targets:
       - "75"
       - "69"
       - "31"
-    indeed_searches:
+    welcome_searches:
       - query: "data engineer"
         location: "Paris"
       - query: "data analyst"
@@ -35,7 +35,7 @@ targets:
       - "33"
       - "21"
       - "44"
-    indeed_searches:
+    welcome_searches:
       - query: "ouvrier agricole"
         location: "Bordeaux"
       - query: "agent viticole"
@@ -57,7 +57,7 @@ targets:
       - "75"
       - "59"
       - "13"
-    indeed_searches:
+    welcome_searches:
       - query: "employe polyvalent restauration"
         location: "Paris"
       - query: "equipier polyvalent"
@@ -79,7 +79,7 @@ targets:
       - "69"
       - "31"
       - "06"
-    indeed_searches:
+    welcome_searches:
       - query: "employe libre service"
         location: "Lyon"
       - query: "hote de caisse"
@@ -101,7 +101,7 @@ targets:
       - "59"
       - "67"
       - "75"
-    indeed_searches:
+    welcome_searches:
       - query: "preparateur de commandes"
         location: "Lille"
       - query: "cariste"
@@ -122,7 +122,7 @@ targets:
       - "42"
       - "51"
       - "68"
-    indeed_searches:
+    welcome_searches:
       - query: "agent de production"
         location: "Saint-Etienne"
       - query: "conducteur de ligne"
@@ -145,7 +145,7 @@ targets:
       - "13"
       - "44"
       - "35"
-    indeed_searches:
+    welcome_searches:
       - query: "macon"
         location: "Marseille"
       - query: "electricien"
@@ -166,7 +166,7 @@ targets:
       - "75"
       - "69"
       - "34"
-    indeed_searches:
+    welcome_searches:
       - query: "agent d'entretien"
         location: "Paris"
       - query: "agent de proprete"
@@ -188,7 +188,7 @@ targets:
       - "31"
       - "33"
       - "06"
-    indeed_searches:
+    welcome_searches:
       - query: "aide soignant"
         location: "Toulouse"
       - query: "auxiliaire de vie"
@@ -210,7 +210,7 @@ targets:
       - "75"
       - "59"
       - "69"
-    indeed_searches:
+    welcome_searches:
       - query: "assistant administratif"
         location: "Paris"
       - query: "secretaire"
