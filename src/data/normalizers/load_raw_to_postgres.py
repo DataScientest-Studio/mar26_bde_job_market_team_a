@@ -3,44 +3,19 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 from typing import Iterable
 
-from dotenv import load_dotenv
-from psycopg import connect
 from psycopg.types.json import Json
 
-load_dotenv()
+from src.database import get_dbt_target, load_project_env, raw_database_connection
+
+load_project_env()
 
 
 DATA_DIR = Path("data/raw")
 INIT_SQL_PATH = Path("models/create_postgredb.sql")
 FRANCE_TRAVAIL_URL = "https://candidat.francetravail.fr/offres/recherche/detail/{offer_id}"
-
-
-def build_connection_string() -> str:
-    target = os.getenv("DBT_TARGET", "dev")
-    print(f"TARGET: {target}")
-
-    if target == "prod":
-        host = os.getenv("SUPABASE_DB_HOST", "")
-        port = os.getenv("SUPABASE_DB_PORT", "5432")
-        dbname = os.getenv("SUPABASE_DB_NAME", "postgres")
-        user = os.getenv("SUPABASE_DB_USER", "postgres")
-        password = os.getenv("SUPABASE_DB_PASSWORD", "")
-        sslmode = "require"
-        return (
-            f"host={host} port={port} dbname={dbname} "
-            f"user={user} password={password} sslmode={sslmode}"
-        )
-
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    dbname = os.getenv("POSTGRES_DB", "job_market")
-    user = os.getenv("POSTGRES_USER", "job_market")
-    password = os.getenv("POSTGRES_PASSWORD", "job_market")
-    return f"host={host} port={port} dbname={dbname} user={user} password={password}"
 
 
 def ensure_landing_tables(conn) -> None:
@@ -192,7 +167,8 @@ def main() -> None:
     args = parse_args()
     total_inserted = 0
 
-    with connect(build_connection_string()) as conn:
+    print(f"TARGET: {get_dbt_target()}")
+    with raw_database_connection() as conn:
         ensure_landing_tables(conn)
 
         if args.source in {"all", "france_travail"}:
