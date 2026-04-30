@@ -1,4 +1,19 @@
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job_market_api
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./src:/app/src:ro
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
   postgres:
     image: postgres:16
     container_name: job_market_postgres
