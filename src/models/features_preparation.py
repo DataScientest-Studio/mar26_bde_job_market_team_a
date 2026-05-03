@@ -19,7 +19,23 @@ to be adapted to the seniority level and the market, but it will help us to capt
 users and job offers without being too granular.
 """
 
+
+from sqlalchemy import Integer, case, desc, func
+from sqlalchemy.sql import Select
+from sqlmodel import select
+
+from src.api.models import Contract, Industry, JobOffer, JobType, Location, Salary, JobSkill, Skill
+
+
 def find_top_skills(limit=50):
+    return (
+        select(JobSkill, Skill)
+        .join(Skill, JobSkill.skill_id == Skill.skill_id)
+        .group_by(Skill.skill_name)
+        .order_by(desc(func.count()))
+        .limit(limit)
+    )
+
     query = f"""
         SELECT skill_name, COUNT(*) AS skill_count
         FROM bridge_job_skill bjs
