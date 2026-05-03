@@ -78,7 +78,7 @@ Seules les tables finales `marts` sont materialisees dans le schema `analytics`.
 
 Tables finales principales :
 
-- `analytics.fct_job_offers` : offres canoniques dedoublonnees
+- `analytics.fact_job_offers` : offres canoniques dedoublonnees
 - `analytics.bridge_job_source` : tracabilite entre offres finales et offres source
 - `analytics.dim_company`
 - `analytics.dim_location`
