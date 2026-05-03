@@ -3,12 +3,20 @@ PIP := $(PYTHON) -m pip
 DBT := $(PYTHON) scripts/run_dbt.py
 LOADER := src/data/normalizers/load_raw_to_postgres.py
 COLLECTOR := src/data/make_dataset.py
+API_HOST := 127.0.0.1
+API_PORT := 8000
 
-.PHONY: help install collect-france-travail collect-indeed postgres-up postgres-down postgres-reset load-raw dbt-run dbt-test pipeline
+.PHONY: help install api api-stop api-docker-build api-docker-up api-docker-down api-docker-logs collect-france-travail collect-indeed postgres-up postgres-down postgres-reset load-raw dbt-run dbt-test pipeline
 
 help:
 	@echo Available targets:
 	@echo   install
+	@echo   api
+	@echo   api-stop
+	@echo   api-docker-build
+	@echo   api-docker-up
+	@echo   api-docker-down
+	@echo   api-docker-logs
 	@echo   collect-france-travail
 	@echo   collect-indeed
 	@echo   postgres-up
@@ -21,6 +29,21 @@ help:
 
 install:
 	$(PIP) install -r requirements.txt
+
+api:
+	$(PYTHON) -m uvicorn src.api.main:app --host $(API_HOST) --port $(API_PORT) --reload
+
+api-docker-build:
+	docker compose build api
+
+api-docker-up:
+	docker compose up -d api
+
+api-docker-down:
+	docker compose stop api
+
+api-docker-logs:
+	docker compose logs -f api
 
 collect-france-travail:
 	$(PYTHON) $(COLLECTOR) --source france_travail
