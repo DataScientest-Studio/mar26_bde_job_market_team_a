@@ -1,13 +1,13 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from datetime import datetime
 from scrapesearchpage import scrape_search_page_to_dict
 from scrapejob import get_jobinfo
 from scrape_entrypage import scrape_searchpages
 import yaml, json, pprint
 
 
-YAML_TAGS = "references/webscraping_metadata.yml"
-JSON_PATH = "src/data/json_export/welcometothejungle.json"
+YAML_TAGS = "references/data_extraction/welcometothejungle/webscraping_metadata.yml"
 
 options = Options()
 options.add_argument("--headless=new")
@@ -17,7 +17,10 @@ driver = webdriver.Chrome(options=options)
 
 
 def export_to_json(result_dict):
-    with open(JSON_PATH, "w", encoding="utf-8") as file:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_path = f"src/data/raw/welcometothejungle/welcometothejungle_{timestamp}.json"
+
+    with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_dict, file, indent=4, ensure_ascii=False)
 
 def parse_yaml_scraping_classes():
