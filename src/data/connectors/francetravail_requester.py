@@ -13,8 +13,8 @@ CLIENT_ID = os.getenv("FRANCE_TRAVAIL_CLIENT_ID")
 CLIENT_SECRET = os.getenv("FRANCE_TRAVAIL_CLIENT_SECRET")
 TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL") # API's token endpoint
 API_BASE_URL = os.getenv("FRANCE_TRAVAIL_BASE_URL")
+SCOPES = os.getenv("FRANCE_TRAVAIL_SCOPE")
 
-SCOPES = "o2dsoffre api_offresdemploiv2"
 REGION_CODES_PATH = "references/data_extraction/francetravail/region_codes.json"
 API_URL = f"{API_BASE_URL}/offres/search"
 
