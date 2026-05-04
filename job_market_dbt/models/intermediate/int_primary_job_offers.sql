@@ -54,11 +54,14 @@ base as (
             ),
             ' | '
         ) as schedule_context_raw,
-        (
+        coalesce(
+            nullif(normalized.raw_payload ->> 'education', ''),
+            (
             select formation ->> 'niveauLibelle'
             from jsonb_array_elements(coalesce(normalized.raw_payload -> 'formations', '[]'::jsonb)) as formation
             order by case when formation ->> 'exigence' = 'E' then 1 else 2 end
             limit 1
+            )
         ) as education_title,
         (
             select coalesce(formation ->> 'domaineLibelle', formation ->> 'domaine')
@@ -127,30 +130,12 @@ derived as (
                 then true
             else false
         end as driving_license,
-        case
-            when salary_raw is not null then 'EUR'
-            else null
-        end as salary_currency,
-        case
-            when lower(coalesce(salary_raw, '')) ~ '\b(mois|mensuel|month)\b' then 'month'
-            when lower(coalesce(salary_raw, '')) ~ '\b(an|annuel|annuelle|year)\b' then 'year'
-            when lower(coalesce(salary_raw, '')) ~ '(/h|\bheure\b|\bhoraire\b)' then 'hour'
-            when lower(coalesce(salary_raw, '')) ~ '\b(semaine|week)\b' then 'week'
-            else null
-        end as salary_frequency_norm,
-        case
-            when lower(coalesce(salary_raw, '')) ~ '(^|[^a-z0-9])k([^a-z0-9]|$)|\bk\s*(eur|euros)\b'
-                then 1000
-            else 1
-        end as salary_unit_multiplier,
-        regexp_match(
-            lower(coalesce(salary_raw, '')),
-            '([0-9]+(\s?[0-9]{3})*([,.][0-9]+)?)\s*(k|eur|euros)?[^0-9,.]+([0-9]+(\s?[0-9]{3})*([,.][0-9]+)?)\s*(k|eur|euros)'
-        ) as salary_range_match,
-        regexp_match(
-            lower(coalesce(salary_raw, '')),
-            '([0-9]+(\s?[0-9]{3})*([,.][0-9]+)?)\s*(k|eur|euros)'
-        ) as salary_single_match,
+        case when salary_raw is not null then 'EUR' else null end as salary_currency,
+        {{ normalize_salary_frequency('salary_raw') }} as salary_frequency_norm,
+        {{ salary_month_count('salary_raw') }} as salary_month_count,
+        {{ salary_unit_multiplier('salary_raw') }} as salary_unit_multiplier,
+        {{ salary_range_match('salary_raw') }} as salary_range_match,
+        {{ salary_single_match('salary_raw') }} as salary_single_match,
         regexp_match(lower(coalesce(experience_raw, '')), '([0-9]+(?:[.,][0-9]+)?)') as experience_match
     from base
 ),
@@ -189,21 +174,10 @@ parsed_values as (
         weekly_hours,
         full_time,
         salary_raw,
-        case
-            when salary_range_match is not null
-                then {{ parse_numeric_text('salary_range_match[1]') }} * salary_unit_multiplier
-            when salary_single_match is not null
-                then {{ parse_numeric_text('salary_single_match[1]') }} * salary_unit_multiplier
-            else null
-        end as salary_min_norm,
-        case
-            when salary_range_match is not null
-                then {{ parse_numeric_text('salary_range_match[5]') }} * salary_unit_multiplier
-            when salary_single_match is not null
-                then {{ parse_numeric_text('salary_single_match[1]') }} * salary_unit_multiplier
-            else null
-        end as salary_max_norm,
         salary_frequency_norm,
+        salary_month_count,
+        {{ parse_salary_min('salary_range_match', 'salary_single_match', 'salary_unit_multiplier') }} as salary_min_norm,
+        {{ parse_salary_max('salary_range_match', 'salary_single_match', 'salary_unit_multiplier') }} as salary_max_norm,
         salary_currency,
         published_at_norm as published_at,
         updated_at,
@@ -263,6 +237,9 @@ final as (
         salary_min_norm,
         salary_max_norm,
         salary_frequency_norm,
+        salary_month_count,
+        {{ annualize_salary('salary_min_norm', 'salary_frequency_norm', 'salary_month_count', 'weekly_hours') }} as annual_salary_min_norm,
+        {{ annualize_salary('salary_max_norm', 'salary_frequency_norm', 'salary_month_count', 'weekly_hours') }} as annual_salary_max_norm,
         salary_currency,
         published_at,
         updated_at,
@@ -313,22 +290,14 @@ final as (
             when industry_norm is not null then md5(industry_norm)
             else null
         end as industry_id,
-        case
-            when salary_min_norm is not null
-                or salary_max_norm is not null
-                or salary_frequency_norm is not null
-                or salary_currency is not null
-                then md5(
-                    coalesce(salary_min_norm::text, '')
-                    || '|'
-                    || coalesce(salary_max_norm::text, '')
-                    || '|'
-                    || coalesce(salary_frequency_norm, '')
-                    || '|'
-                    || coalesce(salary_currency, '')
-                )
-            else null
-        end as salary_id,
+        {{ salary_dimension_id(
+            'salary_min_norm',
+            'salary_max_norm',
+            'salary_frequency_norm',
+            'salary_month_count',
+            'weekly_hours',
+            'salary_currency'
+        ) }} as salary_id,
         created_at
     from parsed_values
 )

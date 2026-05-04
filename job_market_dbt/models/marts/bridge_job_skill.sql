@@ -39,6 +39,15 @@ skill_rows as (
         'license' as skill_category
     from base
     cross join lateral jsonb_array_elements(coalesce(raw_payload -> 'permis', '[]'::jsonb)) as skill
+
+    union all
+
+    select
+        job_id,
+        trim(skill #>> '{}') as skill_name,
+        'competence' as skill_category
+    from base
+    cross join lateral jsonb_array_elements(coalesce(raw_payload -> 'skills', '[]'::jsonb)) as skill
 )
 
 select distinct

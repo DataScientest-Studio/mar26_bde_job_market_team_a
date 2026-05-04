@@ -1,6 +1,6 @@
 with source as (
     select *
-    from {{ source('landing', 'raw_indeed_offers') }}
+    from {{ source('landing', 'raw_welcome_to_the_jungle_offers') }}
 ),
 
 renamed as (
@@ -8,7 +8,7 @@ renamed as (
         raw_offer_id,
         source_system,
         source_offer_id,
-        coalesce(source_url, raw_payload ->> 'job_url') as source_url,
+        source_url,
         source_file_name,
         source_file_path,
         raw_hash,
@@ -29,14 +29,12 @@ renamed as (
             else null
         end as published_at,
         null::timestamptz as updated_at,
-        raw_payload ->> 'working_time' as working_time_raw,
-        null::text as experience_raw,
+        raw_payload ->> 'remote' as working_time_raw,
+        raw_payload ->> 'experience' as experience_raw,
         null::text as rome_code,
-        raw_payload ->> 'rome_family' as rome_family_raw,
+        null::text as rome_family_raw,
         raw_payload ->> 'title' as job_type_raw,
-        raw_payload ->> 'sector' as industry_raw,
-        raw_payload ->> 'search_query' as search_query,
-        raw_payload ->> 'search_location' as search_location
+        raw_payload ->> 'industry' as industry_raw
     from source
 )
 

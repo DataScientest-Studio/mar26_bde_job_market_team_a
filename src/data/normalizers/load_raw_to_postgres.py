@@ -3,10 +3,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Iterable
 
 from psycopg.types.json import Json
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.database import get_dbt_target, load_project_env, raw_database_connection
 
@@ -14,6 +19,7 @@ load_project_env()
 
 
 DATA_DIR = Path("data/raw")
+WELCOME_JSON_EXPORT_PATH = Path("src/data/json_export/welcometothejungle.json")
 INIT_SQL_PATH = Path("models/create_postgredb.sql")
 FRANCE_TRAVAIL_URL = "https://candidat.francetravail.fr/offres/recherche/detail/{offer_id}"
 
@@ -70,17 +76,30 @@ def extract_france_travail_records(file_path: Path) -> list[dict]:
     return records
 
 
-def extract_indeed_records(file_path: Path) -> list[dict]:
+def extract_welcome_to_the_jungle_records(file_path: Path) -> list[dict]:
     payload = load_json_file(file_path)
-    offers = payload if isinstance(payload, list) else []
+    if isinstance(payload, dict):
+        offers = [
+            {**offer, "_source_key": source_key}
+            for source_key, offer in payload.items()
+            if isinstance(offer, dict)
+        ]
+    elif isinstance(payload, list):
+        offers = payload
+    else:
+        offers = []
+
     records: list[dict] = []
 
     for offer in offers:
+        source_offer_id = offer.get("source_job_id") or offer.get("id") or offer.get("_source_key")
+        source_url = offer.get("source_url") or offer.get("job_url") or offer.get("url")
+
         records.append(
             {
-                "source_system": "indeed",
-                "source_offer_id": offer.get("source_job_id"),
-                "source_url": offer.get("job_url"),
+                "source_system": "welcome_to_the_jungle",
+                "source_offer_id": source_offer_id,
+                "source_url": source_url,
                 "source_file_name": file_path.name,
                 "source_file_path": str(file_path.as_posix()),
                 "raw_hash": build_raw_hash(offer),
@@ -89,6 +108,13 @@ def extract_indeed_records(file_path: Path) -> list[dict]:
         )
 
     return records
+
+
+def iter_welcome_to_the_jungle_files() -> Iterable[Path]:
+    files = list(iter_json_files("welcome_to_the_jungle"))
+    if WELCOME_JSON_EXPORT_PATH.exists():
+        files.append(WELCOME_JSON_EXPORT_PATH)
+    return sorted(set(files))
 
 
 def insert_records(conn, table_name: str, records: list[dict]) -> int:
@@ -140,14 +166,14 @@ def load_france_travail(conn) -> int:
     return total_inserted
 
 
-def load_indeed(conn) -> int:
+def load_welcome_to_the_jungle(conn) -> int:
     total_inserted = 0
 
-    for file_path in iter_json_files("indeed"):
-        records = extract_indeed_records(file_path)
-        inserted = insert_records(conn, "raw_indeed_offers", records)
+    for file_path in iter_welcome_to_the_jungle_files():
+        records = extract_welcome_to_the_jungle_records(file_path)
+        inserted = insert_records(conn, "raw_welcome_to_the_jungle_offers", records)
         total_inserted += inserted
-        print(f"[indeed] {file_path.name}: {inserted} offres chargees")
+        print(f"[welcome_to_the_jungle] {file_path.name}: {inserted} offres chargees")
 
     return total_inserted
 
@@ -156,7 +182,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Load raw JSON offers into PostgreSQL landing tables.")
     parser.add_argument(
         "--source",
-        choices=["all", "france_travail", "indeed"],
+        choices=["all", "france_travail", "welcome_to_the_jungle", "welcome"],
         default="all",
         help="Choose which source to load.",
     )
@@ -174,8 +200,8 @@ def main() -> None:
         if args.source in {"all", "france_travail"}:
             total_inserted += load_france_travail(conn)
 
-        if args.source in {"all", "indeed"}:
-            total_inserted += load_indeed(conn)
+        if args.source in {"all", "welcome_to_the_jungle", "welcome"}:
+            total_inserted += load_welcome_to_the_jungle(conn)
 
     print(f"Total inserted rows: {total_inserted}")
 

@@ -6,6 +6,7 @@ from sqlmodel import Field, SQLModel
 
 class Company(SQLModel, table=True):
     __tablename__ = "dim_company"
+    __table_args__ = {"schema": "analytics"}
 
     company_id: str = Field(primary_key=True)
     name: str | None = None
@@ -17,6 +18,7 @@ class Company(SQLModel, table=True):
 
 class Location(SQLModel, table=True):
     __tablename__ = "dim_location"
+    __table_args__ = {"schema": "analytics"}
 
     location_id: str = Field(primary_key=True)
     city: str | None = None
@@ -27,6 +29,7 @@ class Location(SQLModel, table=True):
 
 class Contract(SQLModel, table=True):
     __tablename__ = "dim_contract"
+    __table_args__ = {"schema": "analytics"}
 
     contract_type_id: str = Field(primary_key=True)
     contract_type: str | None = None
@@ -37,6 +40,7 @@ class Contract(SQLModel, table=True):
 
 class Industry(SQLModel, table=True):
     __tablename__ = "dim_industry"
+    __table_args__ = {"schema": "analytics"}
 
     industry_id: str = Field(primary_key=True)
     industry_name: str | None = None
@@ -44,16 +48,20 @@ class Industry(SQLModel, table=True):
 
 class Salary(SQLModel, table=True):
     __tablename__ = "dim_salary"
+    __table_args__ = {"schema": "analytics"}
 
     salary_id: str = Field(primary_key=True)
     frequency: str | None = None
     salary_min: Decimal | None = None
     salary_max: Decimal | None = None
+    annual_salary_min: Decimal | None = None
+    annual_salary_max: Decimal | None = None
     currency: str | None = None
 
 
 class JobType(SQLModel, table=True):
     __tablename__ = "dim_job_type"
+    __table_args__ = {"schema": "analytics"}
 
     job_type_id: str = Field(primary_key=True)
     title: str | None = None
@@ -64,6 +72,7 @@ class JobType(SQLModel, table=True):
 
 class Skill(SQLModel, table=True):
     __tablename__ = "dim_skill"
+    __table_args__ = {"schema": "analytics"}
 
     skill_id: str = Field(primary_key=True)
     skill_name: str
@@ -72,6 +81,7 @@ class Skill(SQLModel, table=True):
 
 class JobSkill(SQLModel, table=True):
     __tablename__ = "bridge_job_skill"
+    __table_args__ = {"schema": "analytics"}
 
     job_skill_id: str = Field(primary_key=True)
     job_id: str
@@ -79,7 +89,8 @@ class JobSkill(SQLModel, table=True):
 
 
 class JobOffer(SQLModel, table=True):
-    __tablename__ = "fct_job_offers"
+    __tablename__ = "fact_job_offers"
+    __table_args__ = {"schema": "analytics"}
 
     job_id: str = Field(primary_key=True)
     company_id: str | None = None

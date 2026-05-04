@@ -12,7 +12,6 @@ class Settings:
     france_travail_scope: str = os.getenv("FRANCE_TRAVAIL_SCOPE", "")
     france_travail_token_url: str = os.getenv("FRANCE_TRAVAIL_TOKEN_URL", "")
     france_travail_base_url: str = os.getenv("FRANCE_TRAVAIL_BASE_URL", "")
-    indeed_base_url: str = os.getenv("INDEED_BASE_URL", "https://fr.indeed.com")
     request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
 
 

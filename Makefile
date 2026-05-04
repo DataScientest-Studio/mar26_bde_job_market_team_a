@@ -6,7 +6,7 @@ COLLECTOR := src/data/make_dataset.py
 API_HOST := 127.0.0.1
 API_PORT := 8000
 
-.PHONY: help install api api-stop api-docker-build api-docker-up api-docker-down api-docker-logs collect-france-travail collect-indeed postgres-up postgres-down postgres-reset load-raw dbt-run dbt-test pipeline
+.PHONY: help install api api-stop api-docker-build api-docker-up api-docker-down api-docker-logs collect-france-travail collect-welcome postgres-up postgres-down postgres-reset load-raw dbt-run dbt-test pipeline
 
 help:
 	@echo Available targets:
@@ -18,7 +18,7 @@ help:
 	@echo   api-docker-down
 	@echo   api-docker-logs
 	@echo   collect-france-travail
-	@echo   collect-indeed
+	@echo   collect-welcome
 	@echo   postgres-up
 	@echo   postgres-down
 	@echo   postgres-reset
@@ -48,8 +48,8 @@ api-docker-logs:
 collect-france-travail:
 	$(PYTHON) $(COLLECTOR) --source france_travail
 
-collect-indeed:
-	$(PYTHON) $(COLLECTOR) --source indeed
+collect-welcome:
+	$(PYTHON) $(COLLECTOR) --source welcome
 
 postgres-up:
 	docker compose up -d postgres
@@ -70,4 +70,4 @@ dbt-run:
 dbt-test:
 	$(DBT) test
 
-pipeline: collect-france-travail collect-indeed load-raw dbt-run dbt-test
+pipeline: collect-france-travail collect-welcome load-raw dbt-run dbt-test

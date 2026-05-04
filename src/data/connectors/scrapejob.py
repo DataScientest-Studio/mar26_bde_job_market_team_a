@@ -17,9 +17,11 @@ def scrape_job_tags(soup, scraping_classes, result_dict):
     #================================ Job tags
     # initializing empty jobtags dictionary to dynamically fill with  scraped tags
     #finding first header of tags in page
-    main_div = soup.select_one(f"div.{scraping_classes["job_tags_class"]}")
+    main_div = soup.select_one(f"div.{scraping_classes['job_tags_class']}")
+    if main_div is None:
+        return result_dict
     #gathering all tags in this header
-    subdiv_elements = main_div.select(f"div.{scraping_classes["job_sub_tags_class"]}")
+    subdiv_elements = main_div.select(f"div.{scraping_classes['job_sub_tags_class']}")
     #getting all new keys and values for the dictionary based on whats displayed on site
     for div in subdiv_elements:
         icon = div.find(lambda tag: tag.name in ["svg", "img"] and tag.get("alt"))
@@ -44,9 +46,11 @@ def scrape_company_industry(soup, scraping_classes, result_dict):
     #============================== Industry
     # industry element is a specific div with the alt="Tag" on the page
     #finding first header of company details
-    company_tags_main_elem = soup.select_one(f"div.{scraping_classes["company_tags_class"]}")
+    company_tags_main_elem = soup.select_one(f"div.{scraping_classes['company_tags_class']}")
+    if company_tags_main_elem is None:
+        return result_dict
     #gathering all tags in this header
-    company_tags_elements = company_tags_main_elem.select(f"div.{scraping_classes["company_sub_tag_class"]}")
+    company_tags_elements = company_tags_main_elem.select(f"div.{scraping_classes['company_sub_tag_class']}")
     #getting all new keys and values for the dictionary based on whats displayed on site
     for div in company_tags_elements:
         icon = div.find(lambda tag: tag.name in ["svg", "img"] and tag.get("alt"))
@@ -65,7 +69,7 @@ def scrape_skills(soup, scraping_classes, result_dict):
     #================================ Skills
     #
     skills_lst = []
-    skills_elements = soup.select(f"div.{scraping_classes["skills_class"]}")
+    skills_elements = soup.select(f"div.{scraping_classes['skills_class']}")
     for skill in skills_elements:
         span = skill.find('span')
         if span:
@@ -76,7 +80,9 @@ def scrape_skills(soup, scraping_classes, result_dict):
         result_dict['skills'] = skills_lst
 
 def get_description_snippet(soup, scraping_classes, result_dict, char_limit=240):
-    description_element = soup.select_one(f"div.{scraping_classes["description_class"]}")
+    description_element = soup.select_one(f"div.{scraping_classes['description_class']}")
+    if description_element is None:
+        return result_dict
     description_text = description_element.get_text(strip=True)
     description_snippet = description_text[:char_limit]
     result_dict['description'] = description_snippet
@@ -101,6 +107,8 @@ def reformat_job_tags(result_dict):
 
 def scrape_publication_datetime(soup, scraping_classes, result_dict,):
     publication_date_element = soup.select_one(f"p.{scraping_classes['publication_date_class']}")
+    if publication_date_element is None:
+        return result_dict
     time_element=publication_date_element.find("time")
     if time_element and time_element.has_attr('datetime'):
         publication_datetime = time_element['datetime']

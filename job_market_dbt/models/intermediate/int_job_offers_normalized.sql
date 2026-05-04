@@ -56,7 +56,7 @@ with unioned as (
         rome_family_raw,
         job_type_raw,
         industry_raw
-    from {{ ref('stg_indeed_offers') }}
+    from {{ ref('stg_welcome_to_the_jungle_offers') }}
 ),
 
 prepared as (
@@ -87,8 +87,8 @@ prepared as (
         contract_type_raw,
         {{ normalize_match_text('contract_type_raw') }} as contract_type_norm,
         case
-            when lower(coalesce(city_raw, '') || ' ' || coalesce(description_raw, '')) like '%teletravail%' then 'teletravail'
-            when lower(coalesce(city_raw, '') || ' ' || coalesce(description_raw, '')) like '%remote%' then 'remote'
+            when lower(coalesce(city_raw, '') || ' ' || coalesce(description_raw, '') || ' ' || coalesce(working_time_raw, '')) like '%teletravail%' then 'teletravail'
+            when lower(coalesce(city_raw, '') || ' ' || coalesce(description_raw, '') || ' ' || coalesce(working_time_raw, '')) like '%remote%' then 'remote'
             else 'non_precise'
         end as remote_norm,
         salary_raw,

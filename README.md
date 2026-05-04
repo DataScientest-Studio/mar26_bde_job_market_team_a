@@ -107,6 +107,48 @@ Deux offres issues de sources differentes peuvent etre rapprochees seulement si 
 
 Quand deux sources matchent, France Travail reste prioritaire comme source primaire.
 
+## API Predict
+
+L'API expose des endpoints de prediction encore prets a brancher aux modeles ML :
+
+- `POST /predict`
+- `POST /predict/salary`
+- `POST /predict/recommendation`
+
+Les anciens formats `GET` restent disponibles pour tester rapidement avec des query params.
+
+Exemple `POST /predict/recommendation` :
+
+```json
+{
+  "skills": ["python", "sql", "airflow"],
+  "experience_years": 3,
+  "expected_salary": 45000,
+  "job_title": "data engineer",
+  "location": "Paris",
+  "contract_type": "CDI",
+  "remote": "teletravail",
+  "education_level": "Bac +5",
+  "industry": "IT / Digital",
+  "limit": 10
+}
+```
+
+Exemple `POST /predict/salary` :
+
+```json
+{
+  "job_title": "data engineer",
+  "experience_years": 3,
+  "skills": ["python", "sql", "dbt"],
+  "location": "Paris",
+  "contract_type": "CDI",
+  "remote": "teletravail",
+  "education_level": "Bac +5",
+  "industry": "IT / Digital"
+}
+```
+
 ## Lancer le projet en local
 
 Installer les dependances :
