@@ -1,23 +1,25 @@
 import requests
-import sys
+import sys, os
 from pprint import pprint
 import json
-
+from datetime import datetime
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+from dotenv import load_dotenv
 
-#TODO Remplacer par les creds du compte jobmarket plutôt que les miens
-CLIENT_ID = "PAR_exercicededata_bfed8ea9c00ca1f95f6e15ac044ac08830738f286682371c8db593d6fc6769a8"
-CLIENT_SECRET = "f9f4ac35c0f48453b01974d4682aaeee3b0650cdde8d7d985225f61b45b77a1b"
-TOKEN_URL = "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire"  # API's token endpoint
+load_dotenv(".env")
+
+CLIENT_ID = os.getenv("FRANCE_TRAVAIL_CLIENT_ID") 
+CLIENT_SECRET = os.getenv("FRANCE_TRAVAIL_CLIENT_SECRET")
+TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL") # API's token endpoint
+API_BASE_URL = os.getenv("FRANCE_TRAVAIL_BASE_URL")
+
 SCOPES = "o2dsoffre api_offresdemploiv2"
-JSON_PATH = "src/data/json_export/francetravail.json"
-
+REGION_CODES_PATH = "references/data_extraction/francetravail/region_codes.json"
+API_URL = f"{API_BASE_URL}/offres/search"
 
 def get_access_token(client_id, client_secret, token_url):
-    """
-    Obtain an OAuth2 access token using the Client Credentials flow.
-    """
+    # OAuth token access
     try:    
         data = {
             "grant_type": "client_credentials",
@@ -65,25 +67,38 @@ def call_protected_api(api_url, token):
         print(f"API request failed: {e}", file=sys.stderr)
         sys.exit(1)
 
+# Parsing du fichier de référence region_codes.json
+def parse_region_codes():
+    with open(REGION_CODES_PATH, 'r') as file:
+        regioncodes_lst = json.load(file)
+    return regioncodes_lst
+
+
 if __name__ == "__main__":
     # access token
     access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
     print(f"Access Token: {access_token}")
 
-    # API endpoint
-    API_URL = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
-    data = call_protected_api(API_URL, access_token)
-    # json_obj = json.loads(str(data))
-    # formatted_data = json.dumps(json_obj)
+    target_regions_lst = parse_region_codes()
 
-    ## load dans un fichier json ?
-    # with open("france_travail.json","w") as fichier:
-        # donnees = json.dump(data, fichier, indent=4)
+    for target_region in target_regions_lst:
+        region_code = target_region['code']
+        region_name = target_region['libelle']
 
-#Parcours des résultats de l'API
-for job_info in data["resultats"]:
-    job_id = job_info["id"]
-    
-    pprint(job_info)
-with open(JSON_PATH, "w", encoding="utf-8") as file:
-    json.dump(data, file, indent=4, ensure_ascii=False)
+        # API endpoint construction
+        search_url = API_URL+f"?region={region_code}"
+        data = call_protected_api(search_url, access_token)
+
+        # appending of the region data
+        data['region']=region_name
+        data['region_code']=region_code
+
+        # Timestamping
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        json_path = f"src/data/raw/francetravail/francetravail_{region_name}_{timestamp}.json"
+
+        # Writing into a json file
+        with open(json_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4, ensure_ascii=False)
+
+
