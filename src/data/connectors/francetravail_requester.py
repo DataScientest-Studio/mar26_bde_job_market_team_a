@@ -6,6 +6,7 @@ from datetime import datetime
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv(".env")
 
@@ -73,8 +74,24 @@ def parse_region_codes():
         regioncodes_lst = json.load(file)
     return regioncodes_lst
 
+def export_to_json(result_dict, region=''):
+    
+    connectors_dir = Path(__file__).parent
+    src_data_dir = connectors_dir.parent
+    src_dir = src_data_dir.parent
+    project_root= src_dir.parent
+
+    data_dump_folder = project_root.joinpath("data/raw/francetravail")
+    data_dump_folder.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_path = data_dump_folder / f"francetravail_{region}{timestamp}.json"
+
+    with open(json_path, "w", encoding="utf-8") as file:
+        json.dump(result_dict, file, indent=4, ensure_ascii=False)
 
 if __name__ == "__main__":
+
     # access token
     access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
     print(f"Access Token: {access_token}")
@@ -93,12 +110,6 @@ if __name__ == "__main__":
         data['region']=region_name
         data['region_code']=region_code
 
-        # Timestamping
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        json_path = f"src/data/raw/francetravail/francetravail_{region_name}_{timestamp}.json"
-
-        # Writing into a json file
-        with open(json_path, "w", encoding="utf-8") as file:
-            json.dump(data, file, indent=4, ensure_ascii=False)
+        export_to_json(data, region_name)
 
 

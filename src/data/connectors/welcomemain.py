@@ -4,8 +4,8 @@ from datetime import datetime
 from scrapesearchpage import scrape_search_page_to_dict
 from scrapejob import get_jobinfo
 from scrape_entrypage import scrape_searchpages
-import yaml, json, pprint
-
+import yaml, json, pprint, os
+from pathlib import Path
 
 YAML_TAGS = "references/data_extraction/welcometothejungle/webscraping_metadata.yml"
 
@@ -17,8 +17,17 @@ driver = webdriver.Chrome(options=options)
 
 
 def export_to_json(result_dict):
+    
+    connectors_dir = Path(__file__).parent
+    src_data_dir = connectors_dir.parent
+    src_dir = src_data_dir.parent
+    project_root= src_dir.parent
+
+    data_dump_folder = project_root.joinpath("data/raw/welcometothejungle")
+    data_dump_folder.mkdir(parents=True, exist_ok=True)
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = f"src/data/raw/welcometothejungle/welcometothejungle_{timestamp}.json"
+    json_path = data_dump_folder / f"welcometothejungle_{timestamp}.json"
 
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_dict, file, indent=4, ensure_ascii=False)
@@ -33,6 +42,7 @@ def parse_yaml_scraping_classes():
 
 def main():
     try:
+        
         scraping_dict = parse_yaml_scraping_classes()
         job_dicts_list=[]
         search_pages_dict = scrape_searchpages(driver,scraping_dict['entry_page'])

@@ -87,9 +87,3 @@ target/
 
 # Mypy cache
 .mypy_cache/
-
-# Extraction data
-src\data\raw\francetravail\*
-!src\data\raw\francetravail\.gitkeep
-src\data\raw\welcometothejungle\*
-!src\data\raw\welcometothejungle\.gitkeep
