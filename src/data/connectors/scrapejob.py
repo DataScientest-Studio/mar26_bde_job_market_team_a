@@ -1,4 +1,3 @@
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -121,10 +120,6 @@ def get_jobinfo(driver,url, scraping_classes):
     except:
         pass
 
-    # Wait for company link and h2 to appear
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a[href^='/fr/companies/']"))
-    )
     WebDriverWait(driver, 10).until(
         EC.presence_of_all_elements_located((By.TAG_NAME, "h2"))
     )
@@ -140,7 +135,7 @@ def get_jobinfo(driver,url, scraping_classes):
     reformat_job_tags(result_dict)
     scrape_skills(soup, scraping_classes, result_dict)
     get_description_snippet(soup,scraping_classes,result_dict)
-    
+    result_dict['id']=url
     #=================
     return result_dict
     
