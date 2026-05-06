@@ -19,9 +19,7 @@ to be adapted to the seniority level and the market, but it will help us to capt
 users and job offers without being too granular.
 """
 
-
-from sqlalchemy import Integer, case, desc, func
-from sqlalchemy.sql import Select
+from sqlalchemy import Engine, Integer, case, desc, engine, func
 from sqlmodel import select
 
 from src.api.models import Contract, Industry, JobOffer, JobType, Location, Salary, JobSkill, Skill
