@@ -19,100 +19,17 @@ to be adapted to the seniority level and the market, but it will help us to capt
 users and job offers without being too granular.
 """
 
-
-from sqlalchemy import Integer, case, desc, func
-from sqlalchemy.sql import Select
+from sqlalchemy import Engine, Integer, case, desc, engine, func
 from sqlmodel import select
 
-from src.api.models import Contract, Industry, JobOffer, JobType, Location, Salary, JobSkill, Skill
-
-
-def find_top_skills(limit=50):
-    return (
-        select(JobSkill, Skill)
-        .join(Skill, JobSkill.skill_id == Skill.skill_id)
-        .group_by(Skill.skill_name)
-        .order_by(desc(func.count()))
-        .limit(limit)
-    )
-
-    query = f"""
-        SELECT skill_name, COUNT(*) AS skill_count
-        FROM bridge_job_skill bjs
-        JOIN dim_skill ds ON bjs.skill_id = ds.skill_id
-        GROUP BY skill_name
-        ORDER BY skill_count DESC
-        LIMIT {limit}
-    """
-
-    # Execute query and load data into DataFrame
-    # df = pd.read_sql(query, connection)
-    # return df["skill_name"].tolist()
-
-    # For demonstration purposes, using a sample list of skills
-    return ["python", "sql", "airflow", "aws", "docker", "kubernetes", "spark", "hadoop", "scala", "java"]
-
-def retrieve_features():
-    query = """
-        SELECT jo.job_id, jo.experience_years, (ds.salary_max+ds.salary_min)/2 AS avg_salary, array_agg(ds.skill_name) AS skills
-        FROM job_offers jo
-        JOIN dim_salary ds ON jo.salary_id = ds.salary_id
-        JOIN bridge_job_skill bjs ON jo.job_id = bjs.job_id
-        JOIN dim_skill ds ON bjs.skill_id = ds.skill_id
-        WHERE ds.frequency == 'yearly'
-        GROUP BY jo.job_id, jo.experience_years, avg_salary
-    """
-
-    # Execute query and load data into DataFrame
-    # df = pd.read_sql(query, connection)
-    # return df
-
-    # For demonstration purposes, using a sample DataFrame
-    jobs = [
-        {
-            "id": 1,
-            "skills": ["python", "sql", "airflow"],
-            "experience": 3,
-        "salary": 45000
-        }
-    ]
-    return pd.DataFrame(jobs)
-
-import joblib
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MultiLabelBinarizer, StandardScaler
 from sklearn.cluster import KMeans
 
-# -----------------------
-# Load data
-# -----------------------
-df = retrieve_features()
+from src.api.models import Contract, Industry, JobOffer, JobType, Location, Salary, JobSkill, Skill
 
-# -----------------------
-# 1. Skills encoding (multi-hot)
-# -----------------------
-
-# Limit skill vocabulary
-# Before MultiLabelBinarizer:
-
-top_skills = find_top_skills(limit=30)
-df["skills"] = df["skills"].apply(lambda s: [x for x in s if x in top_skills])
-
-# Avoid empty vectors
-# If job has no skills after filtering:
-
-df["skills"] = df["skills"].apply(lambda s: s if len(s) > 0 else ["other"])
-
-mlb = MultiLabelBinarizer()
-skills_encoded = mlb.fit_transform(df["skills"])
-
-skills_df = pd.DataFrame(skills_encoded, columns=mlb.classes_)
-
-# -----------------------
-# 2. Experience encoding
-# -----------------------
-def encode_experience(x):
+def _encode_experience(x):
     if x <= 2:
         return 0  # junior
     elif x <= 5:
@@ -120,12 +37,7 @@ def encode_experience(x):
     else:
         return 2  # senior
 
-df["exp_level"] = df["experience"].apply(encode_experience)
-
-# -----------------------
-# 3. Salary bucket
-# -----------------------
-def salary_bucket(x):
+def _salary_bucket(x):
     if x < 30000:
         return 0
     elif x < 60000:
@@ -133,132 +45,80 @@ def salary_bucket(x):
     else:
         return 2
 
-df["salary_bucket"] = df["salary"].apply(salary_bucket)
+def _find_top_skills(engine, limit=50) -> list[str]:
+    skill_name = Skill.skill_name.label("skill_name")
+    skill_count = func.count().label("skill_count")
+    query = (
+        select(skill_name, skill_count).select_from(JobSkill)
+        .join(Skill, JobSkill.skill_id == Skill.skill_id)
+        .group_by(Skill.skill_name)
+        .order_by(desc(skill_count))
+        .limit(limit)
+    )
 
-# -----------------------
-# 4. Final feature matrix
-# -----------------------
-X = pd.concat([
-    skills_df,
-    df[["exp_level", "salary_bucket"]]
-], axis=1)
+    # Execute query and load data into DataFrame
+    df = pd.read_sql_query(query, engine)
+    return df["skill_name"].tolist()
 
-# -----------------------
-# 5. Scaling (important for KMeans)
-# -----------------------
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+def retrieve_features_clustering(engine) -> pd.DataFrame:
+    job_id = JobOffer.job_id.label("job_id")
+    experience_years = JobOffer.experience_years.label("experience_years")
+    salary_amount = (func.coalesce((Salary.salary_min + Salary.salary_max) / 2)).label("mid_salary")
+    skills = func.array_agg(Skill.skill_name).label("skills")
 
-# -----------------------
-# 6. Clustering
-# -----------------------
-kmeans = KMeans(n_clusters=15, random_state=42)
-df["cluster"] = kmeans.fit_predict(X_scaled)
+    query = (
+        select(job_id, experience_years, salary_amount, skills)
+        .select_from(JobOffer)
+        .join(Salary, JobOffer.salary_id == Salary.salary_id)
+        .join(JobSkill, JobOffer.job_id == JobSkill.job_id)
+        .join(Skill, JobSkill.skill_id == Skill.skill_id)
+        # .where(Salary.frequency == 'yearly')
+        .group_by(JobOffer.job_id, JobOffer.experience_years, salary_amount)
+    )
 
-# -----------------------
-# Output
-# -----------------------
-print(df[["id", "cluster"]].head())
-
+    # Execute query and load data into DataFrame
+    df = pd.read_sql_query(query, engine)
+    print(f"Retrieved {len(df)} job offers with features for clustering.")
+    return df
 
 def encode_user_input(
     user_input: pd.DataFrame, mlb: MultiLabelBinarizer,
-    scaler: StandardScaler, kmeans: KMeans) -> np.ndarray:
-    # user_input example:
-    # {"skills": [...], "experience": 3, "salary": 40000}
-
+    scaler: StandardScaler) -> np.ndarray:
     # Skills
     skills_vec = mlb.transform([user_input["skills"]])
-
     # Experience
-    exp = encode_experience(user_input["experience"])
-
+    exp = _encode_experience(user_input["experience"])
     # Salary
-    sal = salary_bucket(user_input["salary"])
-
+    sal = _salary_bucket(user_input["salary"])
     # Combine
     user_vector = np.concatenate([
         skills_vec[0],
         [exp, sal]
     ])
-
     # Scale
     user_vector_scaled = scaler.transform([user_vector])
-
     return user_vector_scaled
 
+# This function will be used to find candidate jobs for a user based on their input.
+import joblib
+def load_clustering_model():
+    kmeans = joblib.load("kmeans.pkl")
+    scaler = joblib.load("scaler.pkl")
+    mlb = joblib.load("mlb.pkl")
+    return kmeans, scaler, mlb
 
-# 50,000 → cluster → 1,000 → ML ranking
-def get_candidate_jobs(
-    user_input: pd.DataFrame, df: pd.DataFrame, mlb: MultiLabelBinarizer,
-    scaler: StandardScaler, kmeans: KMeans) -> pd.DataFrame:
-    user_vector_scaled = encode_user_input(user_input, mlb, scaler, kmeans)
+# kmeans, scaler, mlb = load_clustering_model()
 
+def get_candidate_jobs(encoded_user_input: np.ndarray, df: pd.DataFrame, kmeans: KMeans) -> pd.DataFrame:
     # Predict cluster
-    cluster_id = kmeans.predict(user_vector_scaled)[0]
-
+    cluster_id = kmeans.predict(encoded_user_input)[0]
     candidates = df[df["cluster"] == cluster_id]
-
     return candidates
 
 
-joblib.dump(kmeans, "kmeans.pkl")
-joblib.dump(scaler, "scaler.pkl")
-joblib.dump(mlb, "mlb.pkl")
-
-
 """
-User inputs:
-    - skills
-    - preferred location
-    - expected salary
-    - experience
-    - contract preference
-    - industry preference
-Outputs:
-    - recommended job offers
-    - predicted salary
-
-
-match(user, job) → probability of interest
-
-skill_match_score = # overlap ratio |user_skills ∩ job_skills| / |job_skills|
-experience_gap = user_experience - required_experience
-location_score =    |  1 = same city  
-                    |  0.5 = same region  
-                    |  0 = different
-
-salary_ratio = job_salary / expected_salary
-contract_match (0/1)
-remote_match (0/1)
-
-
-job_popularity = # number of interactions in last X days
-market_demand_score = # how often similar jobs appear
-
-
-# SQL Tables structure:
-features_user_job
------------------
-skill_match_score
-experience_gap
-location_score
-salary_ratio
-contract_match
-remote_match
-# job_popularity
-# market_demand_score
-
-label
-label = 1 → applied / clicked  
-label = 0 → ignored
-
-positive = top matches
-negative = random jobs
-
-
-- MODEL CHOICE : Logistic Regression or LightGBM (if you want slight upgrade)
-Step 1: create a “true relevance score”
+- MODEL CHOICE : Logistic Regression or LightGBM
+Step 1: “true relevance score”
     relevance_score =
         0.5 * skill_match
     + 0.2 * location_match
@@ -273,111 +133,68 @@ Step 2: convert to label
         top 10 jobs per user → label = 1
         rest → label = 0
 
-If you stop here, it’s basic.
-To make it credible:
-    - add randomness (noise)
-    - don’t make rules too perfect
-label = 1 if relevance_score + random_noise > threshold
+{
+    "user": {
+        "skills": ["python", "sql"],
+        "location": "Paris",
+        "region": "Ile-de-France",
+        "expected_salary": 50000,
+        "contract_preference": "full-time"
+    },
+}
 """
 
 
-"""
+def retrieve_jobs_regression(engine) -> pd.DataFrame:
+    job_id = JobOffer.job_id.label("job_id")
+    job_type_id = JobOffer.job_type_id.label("job_type_id")
+    experience_years = JobOffer.experience_years.label("experience_years")
+    contract_type = Contract.contract_type.label("contract_type")
+    salary_amount = (func.coalesce((Salary.salary_min + Salary.salary_max) / 2)).label("mid_salary")
+    skills = func.array_agg(Skill.skill_name).label("skills")
+    location = func.concat(Location.city, ",", Location.region).label("location")
 
-# 1. What is your training set (concretely)
-
-Your training set is a **table you build offline**:
-
-```text
-(user_query_i, job_j, X_ij, y_ij)
-```
-
-Where:
-
-* `user_query_i` = synthetic user (skills, salary, etc.)
-* `job_j` = real job
-* `X_ij` = features (skill_match, salary_ratio, …)
-* `y_ij` = relevance label
-
----
-
-## How you actually construct it
-
-You generate:
-
-```text
-for each job J:
-    create synthetic user U (derived from J)
-
-    → (U, J) → positive example (y = 1)
-
-    for k random jobs J':
-        → (U, J') → negative examples (y = 0)
-```
-
-👉 That’s your dataset.
-
-So your **training set is not given** —
-👉 it is **engineered from your job dataset**
-
-"""
-
-def retrieve_jobs():
-    query = """
-        SELECT jo.job_id, jo.job_type_id, jt.title, jo.experience_years, concat(lo.city, ',', lo.region) AS location,
-                (ds.salary_max+ds.salary_min)/2 AS avg_salary, array_agg(ds.skill_name) AS skills
-        FROM job_offers jo
-        JOIN dim_salary ds ON jo.salary_id = ds.salary_id
-        JOIN bridge_job_skill bjs ON jo.job_id = bjs.job_id
-        JOIN dim_skill ds ON bjs.skill_id = ds.skill_id
-        JOIN dim_job_type jt ON jo.job_type_id = jt.job_type_id
-        JOIN dim_location lo ON jo.location_id = lo.location_id
-        WHERE ds.frequency == 'yearly'
-        GROUP BY jo.job_id, jo.job_type_id, jt.title, jo.experience_years, location, avg_salary
-    """
+    query = (
+        select(job_id, job_type_id, experience_years, contract_type, salary_amount, skills, location)
+        .select_from(JobOffer)
+        .join(Salary, JobOffer.salary_id == Salary.salary_id)
+        .join(JobType, JobOffer.job_type_id == JobType.job_type_id)
+        .join(Skill, JobSkill.skill_id == Skill.skill_id)
+        .join(JobSkill, JobOffer.job_id == JobSkill.job_id)
+        .join(Location, JobOffer.location_id == Location.location_id)
+        .where(Salary.frequency == 'yearly')
+        .group_by(JobOffer.job_id, JobOffer.job_type_id, JobOffer.experience_years, Contract.contract_type, salary_amount, location)
+    )
 
     # Execute query and load data into DataFrame
-    # df = pd.read_sql(query, connection)
-    # return df
+    df = pd.read_sql(query, engine)
+    return df
 
-    return pd.DataFrame([
-        {
-            "id": 1,
-            "skills": ["python", "sql", "airflow"],
-            "experience": 3,
-            "salary": 45000
-        },
-        {
-            "id": 2,
-            "skills": ["java", "kubernetes"],
-            "experience": 5,
-            "salary": 60000
-        }
-    ])
-
-def generate_training_data(jobs):
+def generate_training_data(jobs: pd.DataFrame, engine: Engine) -> list[tuple]:
     training_data = []
-    for job in jobs:
+    for job in jobs.itertuples():
         # Create synthetic user based on job
         user = {
-            "skills": job["skills"],
-            "location": job["location"],
-            "region": job["region"],
-            "expected_salary": job["salary"],
-            "contract_preference": job["contract_type"]
+            "skills": job.skills,
+            "location": job.location,
+            "region": job.region,
+            "expected_salary": job.salary,
+            "contract_preference": job.contract_type
         }
         # Positive example
         training_data.append((user, job, relevance_score(user, job), 1))
 
         # Negative examples
-        for _ in range(5):  # 5 random jobs
-            random_job = get_random_job(job["job_type_id"])  # Function to fetch a random job
+        for _ in range(5):
+            random_job = get_random_job(job["job_type_id"], engine)
             training_data.append((user, random_job, relevance_score(user, random_job), 0))
 
     return training_data
 
-def get_random_job(job_id: str) -> dict:
+def get_random_job(job: pd.DataFrame, engine: Engine) -> dict:
     # This function should return a random job from your dataset
-    # For demonstration, we return a dummy job
+    query = select(JobOffer).order_by(func.random()).limit(1)
+    random_job = pd.read_sql(query, engine).iloc[0]
     return {
         "skills": ["random_skill"],
         "location": "random_location",
@@ -387,7 +204,6 @@ def get_random_job(job_id: str) -> dict:
     }
 
 
-# match(user, job) → probability of interest
 
 def skill_match_score(user_skills, job_skills) -> float:
     return len(set(user_skills) & set(job_skills)) / len(set(job_skills)) if job_skills else 0
@@ -416,26 +232,25 @@ def relevance_score(user, job) -> float:
     return (
         0.5 * skill_match_score(user["skills"], job["skills"]) +
         0.2 * location_score(user["location"], job["location"], user["region"], job["region"]) +
-        0.2 * salary_ratio(job["salary"], user["expected_salary"]) +
+        0.2 * salary_ratio(job["mid_salary"], user["expected_salary"]) +
         0.1 * contract_match(user["contract_preference"], job["contract_type"])
     )
 
 # 2. How do you prepare your features for the matching model? Encodings and cleaning and normalization, etc.
 def prepare_features_regression(training_data):
     # This function will take your raw training data and convert it into a feature matrix X and label vector y
-    # For example, you can create a DataFrame from training_data and then apply the necessary transformations
     df = pd.DataFrame(training_data, columns=["user", "job", "relevance_score", "label"])
 
     # Get top skills
-    top_skills = find_top_skills(50)
+    top_skills = _find_top_skills(50)
 
     # Create feature skill score match
     df["skill_match_score"] = df.apply(lambda row: skill_match_score(row["user"]["skills"], row["job"]["skills"]), axis=1)
     feature_cols = ["skill_match_score"]
 
     # Normalize salaries
-    df['user_salary_norm'] = (df['user'].apply(lambda u: u['expected_salary']) - df['user'].apply(lambda u: u['expected_salary']).mean()) / df['user'].apply(lambda u: u['expected_salary']).std()
-    df['job_salary_norm'] = (df['job'].apply(lambda j: j['salary']) - df['job'].apply(lambda j: j['salary']).mean()) / df['job'].apply(lambda j: j['salary']).std()
+    df['user_salary_norm'] = (df['user']['expected_salary'] - df['user']['expected_salary'].mean()) / df['user']['expected_salary'].std()
+    df['job_salary_norm'] = (df['job']['salary'] - df['job']['salary'].mean()) / df['job']['salary'].std()
     feature_cols.extend(['user_salary_norm', 'job_salary_norm'])
 
     # Location and region matches
@@ -455,21 +270,21 @@ def prepare_features_regression(training_data):
 
 def train_model(X, y):
     # This function will take your feature matrix X and label vector y and train a machine learning model
-    # For example, you can use Logistic Regression or LightGBM
+    # Logistic Regression or LightGBM
     from sklearn.linear_model import LogisticRegression
     model = LogisticRegression()
     model.fit(X, y)
     return model
 
 def predict(user_input, model, mlb, scaler):
-    result = model.predict_proba(prepare_features_for_prediction(user_input, mlb, scaler))[:, 1]  # Get probability of relevance
-    return [("job_id_1", 0.9), ("job_id_2", 0.8), ("job_id_3", 0.7)]
+    result = model.predict_proba(prepare_features_for_prediction(user_input, mlb, scaler))[:, 1]
+    return result # [("job_id_1", 0.9), ("job_id_2", 0.8), ("job_id_3", 0.7)]
 
-def prepare_features_for_prediction(user_input, mlb, scaler):
+def prepare_features_for_prediction(user_input, df, kmeans, mlb, scaler) -> pd.DataFrame:
     # Get clustering results to reduce search space
     encoded_user = encode_user_input(user_input, mlb, scaler, kmeans)
-    reduced_jobs = get_candidate_jobs(user_input, df, mlb, scaler, kmeans)
-    return [[0.5, 0.0, 1.0, 0.0]]  # Example feature vector for prediction
+    reduced_jobs = get_candidate_jobs(encoded_user, df, kmeans)
+    return reduced_jobs
 
 
 
@@ -482,4 +297,3 @@ Features:
     - experience_level (categorical)
     - contract_type (one-hot)
 """
-
