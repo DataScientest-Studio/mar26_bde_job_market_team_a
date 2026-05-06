@@ -85,7 +85,7 @@ def export_to_json(result_dict, region=''):
     data_dump_folder.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = data_dump_folder / f"francetravail_{region}{timestamp}.json"
+    json_path = data_dump_folder / f"francetravail_region{region}_{timestamp}.json"
 
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_dict, file, indent=4, ensure_ascii=False)
@@ -110,6 +110,6 @@ if __name__ == "__main__":
         data['region']=region_name
         data['region_code']=region_code
 
-        export_to_json(data, region_name)
+        export_to_json(data, region_code)
 
 
