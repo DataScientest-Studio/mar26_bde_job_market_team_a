@@ -67,16 +67,18 @@ def trends_by_contract_type_statement() -> Select:
 
 
 def salary_by_job_statement() -> Select:
-    job_title = func.coalesce(JobType.title, JobOffer.title_norm, JobOffer.title_raw, "Non renseigne").label(
-        "job_title"
-    )
+    job_title = func.coalesce(JobType.title, "Non renseigne").label("job_title")
     year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
+    salary_amount = (
+        (func.coalesce(Salary.salary_min, Salary.salary_max) + func.coalesce(Salary.salary_max, Salary.salary_min)) / 2
+    )
     annual_salary_amount = (
-        (
-            func.coalesce(Salary.annual_salary_min, Salary.annual_salary_max)
-            + func.coalesce(Salary.annual_salary_max, Salary.annual_salary_min)
+        case(
+            (Salary.frequency == "month", salary_amount * 12),
+            (Salary.frequency == "week", salary_amount * 52),
+            (Salary.frequency == "hour", salary_amount * 35 * 52),
+            else_=salary_amount,
         )
-        / 2
     )
     avg_salary = func.round(func.avg(annual_salary_amount), 2).label("avg_salary")
     nb_offres = func.count().cast(Integer).label("nb_offres")
@@ -85,7 +87,7 @@ def salary_by_job_statement() -> Select:
         select(job_title, year, avg_salary, nb_offres)
         .join(JobType, JobOffer.job_type_id == JobType.job_type_id)
         .join(Salary, JobOffer.salary_id == Salary.salary_id)
-        .where((Salary.annual_salary_min.is_not(None) | Salary.annual_salary_max.is_not(None)))
+        .where((Salary.salary_min.is_not(None) | Salary.salary_max.is_not(None)))
         .where(annual_salary_amount.between(MIN_DASHBOARD_ANNUAL_SALARY, MAX_DASHBOARD_ANNUAL_SALARY))
         .where(JobOffer.published_at.is_not(None))
         .group_by(job_title, year)

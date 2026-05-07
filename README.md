@@ -176,6 +176,17 @@ Charger le raw dans PostgreSQL :
 python src\data\normalizers\load_raw_to_postgres.py --source all
 ```
 
+Par defaut, le loader charge uniquement les fichiers JSON suffixes par la date du jour
+au format `YYYY-MM-DD`
+et ignore les offres deja presentes avec le meme `raw_hash`.
+
+Pour charger une date precise ou tout l'historique :
+
+```
+python src\data\normalizers\load_raw_to_postgres.py --source all --date 2026-05-06
+python src\data\normalizers\load_raw_to_postgres.py --source all --all-files
+```
+
 Lancer dbt :
 
 ```

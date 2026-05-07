@@ -6,7 +6,7 @@ COLLECTOR := src/data/make_dataset.py
 API_HOST := 127.0.0.1
 API_PORT := 8000
 
-.PHONY: help install api api-stop api-docker-build api-docker-up api-docker-down api-docker-logs collect-france-travail collect-welcome postgres-up postgres-down postgres-reset load-raw dbt-run dbt-test pipeline
+.PHONY: help install api api-stop api-docker-build api-docker-up api-docker-down api-docker-logs collect-france-travail collect-welcome postgres-up postgres-down postgres-reset load-raw load-raw-all reset-db_with_new_data dbt-run dbt-test pipeline
 
 help:
 	@echo Available targets:
@@ -23,6 +23,8 @@ help:
 	@echo   postgres-down
 	@echo   postgres-reset
 	@echo   load-raw
+	@echo   load-raw-all
+	@echo   reset-db_with_new_data
 	@echo   dbt-run
 	@echo   dbt-test
 	@echo   pipeline
@@ -63,6 +65,14 @@ postgres-reset:
 
 load-raw:
 	$(PYTHON) $(LOADER) --source all
+
+load-raw-all:
+	$(PYTHON) $(LOADER) --source all --all-files
+
+reset-db-and-load:
+	$(PYTHON) $(LOADER) --source all --all-files --reset-landing
+
+reset-db_with_new_data: reset-db-and-load dbt-run
 
 dbt-run:
 	$(DBT) run

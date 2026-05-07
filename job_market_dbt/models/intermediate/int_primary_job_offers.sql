@@ -1,11 +1,12 @@
-/* une ligne par offre canonique en gardant la source primaire */
+-- Une ligne par offre canonique, construite à partir de la source primaire
 with primary_matches as (
     select *
     from {{ ref('int_job_offer_matches') }}
     where is_primary_source
 ),
 
-base as (
+primary_source_offers as (
+    -- Récupère le payload complet de la source choisie pour enrichir l'offre canonique
     select
         matches.job_id,
         matches.match_rule,
@@ -26,6 +27,7 @@ base as (
         normalized.description_norm,
         normalized.company_raw,
         normalized.company_norm,
+        normalized.company_match_norm,
         normalized.city_raw,
         normalized.city_norm,
         normalized.region_norm,
@@ -74,44 +76,19 @@ base as (
         on matches.normalized_offer_id = normalized.normalized_offer_id
 ),
 
-derived as (
+enriched_offers as (
+    -- Ajoute les attributs métier dérivés : temps de travail, salaire, formation, secteur
     select
-        base.*,
-        {{ normalize_match_text('industry_raw') }} as industry_norm,
-        case
-            when lower(coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')) ~ '([0-9]+(?:[.,][0-9]+)?)\s*h'
-                then replace(
-                    (
-                        regexp_match(
-                            lower(coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')),
-                            '([0-9]+(?:[.,][0-9]+)?)\s*h'
-                        )
-                    )[1],
-                    ',',
-                    '.'
-                )::numeric
-            else null
-        end as weekly_hours,
-        case
-            when lower(coalesce(contract_type_raw, '') || ' ' || coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')) like '%temps plein%'
-                or lower(coalesce(contract_type_raw, '') || ' ' || coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')) like '%full time%'
-                then true
-            when lower(coalesce(contract_type_raw, '') || ' ' || coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')) like '%temps partiel%'
-                or lower(coalesce(contract_type_raw, '') || ' ' || coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')) like '%part time%'
-                then false
-            when lower(coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')) ~ '([0-9]+(?:[.,][0-9]+)?)\s*h'
-                then replace(
-                    (
-                        regexp_match(
-                            lower(coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')),
-                            '([0-9]+(?:[.,][0-9]+)?)\s*h'
-                        )
-                    )[1],
-                    ',',
-                    '.'
-                )::numeric >= 35
-            else null
-        end as full_time,
+        primary_source_offers.*,
+        {{ clean_analytics_label('industry_raw') }} as industry_norm,
+        {{ clean_analytics_label('coalesce(rome_family_raw, industry_raw)') }} as job_category_norm,
+        {{ clean_analytics_label('rome_family_raw') }} as rome_family_norm,
+        {{ clean_analytics_label('education_title') }} as education_title_norm,
+        {{ clean_analytics_label('education_field') }} as education_field_norm,
+        {{ company_size_min('company_size_raw') }} as company_size_min,
+        {{ company_size_max('company_size_raw') }} as company_size_max,
+        {{ weekly_hours_from_text("coalesce(working_time_raw, '') || ' ' || coalesce(schedule_context_raw, '')") }} as weekly_hours,
+        {{ full_time_from_context('contract_type_raw', 'working_time_raw', 'schedule_context_raw') }} as full_time,
         case
             when raw_payload ? 'entrepriseAdaptee'
                 then (raw_payload ->> 'entrepriseAdaptee')::boolean
@@ -136,11 +113,12 @@ derived as (
         {{ salary_unit_multiplier('salary_raw') }} as salary_unit_multiplier,
         {{ salary_range_match('salary_raw') }} as salary_range_match,
         {{ salary_single_match('salary_raw') }} as salary_single_match,
-        regexp_match(lower(coalesce(experience_raw, '')), '([0-9]+(?:[.,][0-9]+)?)') as experience_match
-    from base
+        {{ experience_years_from_text('experience_raw') }} as experience_years
+    from primary_source_offers
 ),
 
-parsed_values as (
+parsed_offers as (
+    -- Convertit les valeurs extraites en champs analytiques directement exploitables
     select
         job_id,
         match_rule,
@@ -161,6 +139,7 @@ parsed_values as (
         description_norm,
         company_raw,
         company_norm,
+        company_match_norm,
         city_raw,
         city_norm,
         region_norm,
@@ -182,26 +161,40 @@ parsed_values as (
         published_at_norm as published_at,
         updated_at,
         experience_raw,
-        case
-            when experience_match is not null
-                then replace(experience_match[1], ',', '.')::numeric
-            else null
-        end as experience_years,
+        experience_years,
         handicap_friendly,
         driving_license,
         rome_code,
         rome_family_raw,
+        rome_family_norm,
         job_type_raw,
+        job_category_norm,
         industry_raw,
         industry_norm,
         company_size_raw,
+        company_size_min,
+        company_size_max,
         education_title,
         education_field,
+        education_title_norm,
+        education_field_norm,
         created_at
-    from derived
+    from enriched_offers
+),
+
+cleaned_offers as (
+    -- Écarte les salaires absurdes tout en conservant l'offre dans la fact
+    select
+        *,
+        {{ guarded_salary_amount('salary_min_norm', 'salary_frequency_norm') }} as salary_min_guarded,
+        {{ guarded_salary_amount('salary_max_norm', 'salary_frequency_norm') }} as salary_max_guarded,
+        {{ has_guarded_salary('salary_min_norm', 'salary_max_norm', 'salary_frequency_norm') }} as has_guarded_salary,
+        contract_type_norm as contract_type_clean
+    from parsed_offers
 ),
 
 final as (
+    -- Calcule les clés de dimensions à partir des valeurs déjà nettoyées
     select
         job_id,
         match_rule,
@@ -228,19 +221,17 @@ final as (
         country_norm,
         postal_code,
         contract_type_raw,
-        contract_type_norm,
+        contract_type_clean as contract_type_norm,
         remote_norm,
         working_time_raw,
         weekly_hours,
         full_time,
         salary_raw,
-        salary_min_norm,
-        salary_max_norm,
-        salary_frequency_norm,
-        salary_month_count,
-        {{ annualize_salary('salary_min_norm', 'salary_frequency_norm', 'salary_month_count', 'weekly_hours') }} as annual_salary_min_norm,
-        {{ annualize_salary('salary_max_norm', 'salary_frequency_norm', 'salary_month_count', 'weekly_hours') }} as annual_salary_max_norm,
-        salary_currency,
+        salary_min_guarded as salary_min_norm,
+        salary_max_guarded as salary_max_norm,
+        case when has_guarded_salary then salary_frequency_norm else null end as salary_frequency_norm,
+        case when has_guarded_salary then salary_month_count else null end as salary_month_count,
+        case when has_guarded_salary then salary_currency else null end as salary_currency,
         published_at,
         updated_at,
         experience_raw,
@@ -249,18 +240,27 @@ final as (
         driving_license,
         rome_code,
         rome_family_raw,
+        rome_family_norm,
         job_type_raw,
+        job_category_norm,
         industry_raw,
         industry_norm,
         company_size_raw,
+        company_size_min,
+        company_size_max,
         education_title,
         education_field,
+        education_title_norm,
+        education_field_norm,
         case
-            when coalesce(education_title, education_field) is not null
-                then md5(coalesce(education_title, '') || '|' || coalesce(education_field, ''))
+            when coalesce(education_title_norm, education_field_norm) is not null
+                then md5(coalesce(education_title_norm, '') || '|' || coalesce(education_field_norm, ''))
             else null
         end as education_id,
-        md5(coalesce(company_norm, '') || '|' || coalesce(company_raw, '')) as company_id,
+        case
+            when company_match_norm is not null then md5(company_match_norm)
+            else null
+        end as company_id,
         md5(
             coalesce(city_norm, '')
             || '|'
@@ -271,7 +271,7 @@ final as (
             || coalesce(country_norm, '')
         ) as location_id,
         md5(
-            coalesce(contract_type_norm, '')
+            coalesce(contract_type_clean, '')
             || '|'
             || coalesce(remote_norm, '')
             || '|'
@@ -284,22 +284,22 @@ final as (
             || '|'
             || coalesce(rome_code, '')
             || '|'
-            || coalesce(rome_family_raw, '')
+            || coalesce(rome_family_norm, '')
         ) as job_type_id,
         case
             when industry_norm is not null then md5(industry_norm)
             else null
         end as industry_id,
         {{ salary_dimension_id(
-            'salary_min_norm',
-            'salary_max_norm',
-            'salary_frequency_norm',
-            'salary_month_count',
+            'salary_min_guarded',
+            'salary_max_guarded',
+            'case when has_guarded_salary then salary_frequency_norm else null end',
+            'case when has_guarded_salary then salary_month_count else null end',
             'weekly_hours',
-            'salary_currency'
+            'case when has_guarded_salary then salary_currency else null end'
         ) }} as salary_id,
         created_at
-    from parsed_values
+    from cleaned_offers
 )
 
 select *

@@ -10,7 +10,6 @@ class Company(SQLModel, table=True):
 
     company_id: str = Field(primary_key=True)
     name: str | None = None
-    name_normalized: str | None = None
     size_min: int | None = None
     size_max: int | None = None
     country: str | None = None
@@ -54,8 +53,6 @@ class Salary(SQLModel, table=True):
     frequency: str | None = None
     salary_min: Decimal | None = None
     salary_max: Decimal | None = None
-    annual_salary_min: Decimal | None = None
-    annual_salary_max: Decimal | None = None
     currency: str | None = None
 
 
@@ -100,10 +97,6 @@ class JobOffer(SQLModel, table=True):
     industry_id: str | None = None
     salary_id: str | None = None
     education_id: str | None = None
-    title_raw: str | None = None
-    title_norm: str | None = None
-    description_raw: str | None = None
-    description_norm: str | None = None
     primary_source_system: str | None = None
     primary_source_offer_id: str | None = None
     primary_source_url: str | None = None

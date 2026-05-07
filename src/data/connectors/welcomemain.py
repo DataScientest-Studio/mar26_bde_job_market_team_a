@@ -11,7 +11,7 @@ from scrape_entrypage import scrape_searchpages
 import yaml, json, pprint, os
 from pathlib import Path
 
-YAML_TAGS = "references/data_extraction/welcometothejungle/webscraping_metadata.yml"
+YAML_TAGS = "references/data_extraction/welcome_to_the_jungle/webscraping_metadata.yml"
 
 options = Options()
 options.add_argument("--headless=new")
@@ -28,14 +28,16 @@ def export_to_json(result_dict):
     src_dir = src_data_dir.parent
     project_root= src_dir.parent
 
-    data_dump_folder = project_root.joinpath("data/raw/welcometothejungle")
+    data_dump_folder = project_root.joinpath("data/raw/welcome_to_the_jungle")
     data_dump_folder.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = data_dump_folder / f"welcometothejungle_{timestamp}.json"
+    collection_date = datetime.now().strftime("%Y-%m-%d")
+    json_path = data_dump_folder / f"welcome_to_the_jungle_{collection_date}.json"
 
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_dict, file, indent=4, ensure_ascii=False)
+
+    return json_path
 
 
 def parse_yaml_scraping_classes():
@@ -82,8 +84,7 @@ def collect_welcome_to_the_jungle():
                 print(f"  {key}: {value}")
 
         pprint.pprint(job_results_dict)
-        export_to_json(job_results_dict)
-        return JSON_PATH
+        return export_to_json(job_results_dict)
     finally:
         driver.quit()
 
