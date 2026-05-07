@@ -17,6 +17,7 @@ raw_france_travail_offers = Table(
     Column("raw_hash", Text, nullable=False),
     Column("ingested_at", DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()),
     Column("raw_payload", JSONB, nullable=False),
+    schema="landing",
 )
 
 raw_welcome_to_the_jungle_offers = Table(
@@ -31,6 +32,7 @@ raw_welcome_to_the_jungle_offers = Table(
     Column("raw_hash", Text, nullable=False),
     Column("ingested_at", DateTime(timezone=True), nullable=False, server_default=func.current_timestamp()),
     Column("raw_payload", JSONB, nullable=False),
+    schema="landing",
 )
 
 landing_indexes = [

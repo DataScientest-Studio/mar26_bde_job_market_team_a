@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import delete, desc, func, select
+from sqlalchemy import delete, desc, func, select, text
 from sqlalchemy.schema import CreateSchema, DropIndex, Index
 
 from src.data.landing.tables import (
@@ -13,8 +13,14 @@ from src.data.landing.tables import (
 
 
 def drop_landing_tables(conn) -> None:
+    preparer = conn.dialect.identifier_preparer
     for table in (raw_welcome_to_the_jungle_offers, raw_france_travail_offers):
-        table.drop(conn, checkfirst=True)
+        qualified_name = ".".join(
+            preparer.quote(identifier)
+            for identifier in (table.schema, table.name)
+            if identifier
+        )
+        conn.execute(text(f"DROP TABLE IF EXISTS {qualified_name} CASCADE"))
 
 
 def ensure_landing_schema(conn) -> None:
