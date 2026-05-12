@@ -1,6 +1,7 @@
 PYTHON := .venv/Scripts/python.exe
 PIP := $(PYTHON) -m pip
 DBT := $(PYTHON) scripts/run_dbt.py
+DBT_SELECT ?=
 LOADER := src/data/normalizers/load_raw_to_postgres.py
 COLLECTOR := src/data/make_dataset.py
 API_HOST := 127.0.0.1
@@ -75,9 +76,9 @@ reset-db-and-load:
 reset-db_with_new_data: reset-db-and-load dbt-run
 
 dbt-run:
-	$(DBT) run
+	$(DBT) run $(if $(DBT_SELECT),--select $(DBT_SELECT),)
 
 dbt-test:
-	$(DBT) test
+	$(DBT) test $(if $(DBT_SELECT),--select $(DBT_SELECT),)
 
 pipeline: collect-france-travail collect-welcome load-raw dbt-run dbt-test

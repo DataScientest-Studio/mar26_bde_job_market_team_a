@@ -1,4 +1,14 @@
 -- Une ligne par offre source, avec des libellés nettoyés avant le matching inter-source
+{{
+    config(
+        indexes=[
+            {'columns': ['normalized_offer_id'], 'unique': True},
+            {'columns': ['company_match_norm', 'city_match_norm', 'match_reference_date']},
+            {'columns': ['source_system']}
+        ]
+    )
+}}
+
 with unioned as (
     -- Aligne les deux sources dans un même contrat de colonnes
     select

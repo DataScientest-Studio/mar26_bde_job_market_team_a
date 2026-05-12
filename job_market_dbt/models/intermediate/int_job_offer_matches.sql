@@ -1,5 +1,16 @@
 -- Regroupe les offres FT/WTTJ qui semblent représenter le même poste
 -- La source primaire reste France Travail quand une paire est détectée
+{{
+    config(
+        indexes=[
+            {'columns': ['job_source_id'], 'unique': True},
+            {'columns': ['normalized_offer_id']},
+            {'columns': ['job_id']},
+            {'columns': ['is_primary_source']}
+        ]
+    )
+}}
+
 with base as (
     -- Petite normalisation de synonymes courts pour le fuzzy matching du titre
     select
