@@ -1,3 +1,5 @@
+-- Expose les champs France Travail utiles au reste du pipeline
+-- Cette couche reste proche du JSON source : extraction et typage léger uniquement
 with source as (
     select *
     from {{ source('landing', 'raw_france_travail_offers') }}
@@ -21,7 +23,6 @@ renamed as (
         raw_payload #>> '{lieuTravail,codePostal}' as postal_code_raw,
         raw_payload #>> '{lieuTravail,commune}' as commune_code_raw,
         raw_payload ->> 'typeContratLibelle' as contract_type_raw,
-        raw_payload ->> 'natureContrat' as contract_nature_raw,
         coalesce(
             nullif(raw_payload #>> '{salaire,libelle}', ''),
             nullif(raw_payload #>> '{salaire,commentaire}', '')

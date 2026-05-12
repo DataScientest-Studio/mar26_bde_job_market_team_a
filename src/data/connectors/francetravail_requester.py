@@ -3,8 +3,6 @@ import sys, os
 from pprint import pprint
 import json
 from datetime import datetime
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -16,7 +14,7 @@ TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL") # API's token endpoint
 API_BASE_URL = os.getenv("FRANCE_TRAVAIL_BASE_URL")
 SCOPES = os.getenv("FRANCE_TRAVAIL_SCOPE")
 
-REGION_CODES_PATH = "references/data_extraction/francetravail/region_codes.json"
+REGION_CODES_PATH = "references/data_extraction/france_travail/region_codes.json"
 API_URL = f"{API_BASE_URL}/offres/search"
 
 def get_access_token(client_id, client_secret, token_url):
@@ -81,11 +79,11 @@ def export_to_json(result_lst, region=''):
     src_dir = src_data_dir.parent
     project_root= src_dir.parent
 
-    data_dump_folder = project_root.joinpath("data/raw/francetravail")
+    data_dump_folder = project_root.joinpath("data/raw/france_travail")
     data_dump_folder.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = data_dump_folder / f"francetravail_region{region}_{timestamp}.json"
+    collection_date = datetime.now().strftime("%Y-%m-%d")
+    json_path = data_dump_folder / f"france_travail_{region}_{collection_date}.json"
 
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_lst, file, indent=4, ensure_ascii=False)
@@ -116,7 +114,33 @@ def gather_data_from_api(target_regions_lst, access_token):
             # regroupement des jobs dans une liste de pages
             data_regionpages_lst.append(data)
 
-            
+        export_to_json(data_regionpages_lst, region_code)
+
+def gather_data_from_api(target_regions_lst, access_token):
+    # parcours des régions
+    for target_region in target_regions_lst:
+        region_code = target_region['code']
+        region_name = target_region['libelle']
+        data_regionpages_lst = []
+
+        for page in range(21):
+            # parcours des pages par plages d'index (max index 3149)
+            first_index = page*150
+            last_index = first_index+150-1
+            search_range = f"{first_index}-{last_index}"
+
+            # API endpoint construction
+            search_url = API_URL+f"?region={region_code}&range={search_range}"
+            data = call_protected_api(search_url, access_token)
+            if data == None:
+                print(f"{region_name}: No more data found starting index {first_index}.")
+                break
+            # appending of the region data to the dictionary for referencing
+            data['region']=region_name
+            data['region_code']=region_code
+
+            # regroupement des jobs dans une liste de pages
+            data_regionpages_lst.append(data)
 
         export_to_json(data_regionpages_lst, region_code)
 if __name__ == "__main__":

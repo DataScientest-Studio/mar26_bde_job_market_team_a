@@ -9,8 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data.connectors.france_travail import FranceTravailClient
-# from src.data.connectors.indeed import IndeedSeleniumScraper
-from src.data.connectors.welcometothejungle import WelcomeSeleniumScraper
+from src.data.connectors.welcomemain import collect_welcome_to_the_jungle
 
 DEFAULT_TARGETS_FILE = "references/collection_targets.yml"
 
@@ -23,26 +22,16 @@ def run_france_travail() -> None:
     print(f"[France Travail] sauvegarde dans {path}")
 
 
-# def run_indeed() -> None:
-#     scraper = IndeedSeleniumScraper()
-#     searches = scraper.load_searches_from_targets_file(DEFAULT_TARGETS_FILE)
-#     jobs = scraper.collect_jobs_from_queries(searches)
-#     path = scraper.save_raw_json(jobs)
-#     print(f"[Indeed] {len(jobs)} offres extraites dans {path}")
-
 def run_welcome() -> None:
-    scraper = WelcomeSeleniumScraper()
-    searches = scraper.load_searches_from_targets_file(DEFAULT_TARGETS_FILE)
-    jobs = scraper.collect_jobs_from_queries(searches)
-    path = scraper.save_raw_json(jobs)
-    print(f"[WelcomeToTheJungle] {len(jobs)} offres extraites dans {path}")
+    path = collect_welcome_to_the_jungle()
+    print(f"[WelcomeToTheJungle] offres extraites dans {path}")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect raw job offers.")
     parser.add_argument(
         "--source",
-        choices=["france_travail", "indeed", "welcome" "all"],
+        choices=["france_travail", "welcome_to_the_jungle", "welcome", "all"],
         default="all",
     )
     return parser.parse_args()
@@ -51,13 +40,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    # if args.source in {"all", "france_travail"}:
-    #     run_france_travail()
-
-    # if args.source in {"all", "indeed"}:
-    #     run_indeed()
+    if args.source in {"all", "france_travail"}:
+        run_france_travail()
     
-    if args.source in {"all", "welcometothejungle"}:
+    if args.source in {"all", "welcome_to_the_jungle", "welcome"}:
         run_welcome()
 
 

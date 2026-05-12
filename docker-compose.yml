@@ -34,7 +34,6 @@ services:
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./models/create_postgredb.sql:/docker-entrypoint-initdb.d/01_create_landing.sql:ro
 
   pgadmin:
     image: dpage/pgadmin4:9
