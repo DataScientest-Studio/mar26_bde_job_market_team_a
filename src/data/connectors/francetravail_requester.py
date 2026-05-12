@@ -49,6 +49,7 @@ def get_access_token(client_id, client_secret, token_url):
         print(f"Invalid token response: {e}", file=sys.stderr)
         sys.exit(1)
 
+
 def call_protected_api(api_url, token):
     """
     Call a protected API endpoint using the access token.
@@ -72,7 +73,7 @@ def parse_region_codes():
     return regioncodes_lst
 
 def export_to_json(result_lst, region=''):
-
+    
     connectors_dir = Path(__file__).parent
     src_data_dir = connectors_dir.parent
     src_dir = src_data_dir.parent
@@ -115,6 +116,33 @@ def gather_data_from_api(target_regions_lst, access_token):
 
         export_to_json(data_regionpages_lst, region_code)
 
+def gather_data_from_api(target_regions_lst, access_token):
+    # parcours des régions
+    for target_region in target_regions_lst:
+        region_code = target_region['code']
+        region_name = target_region['libelle']
+        data_regionpages_lst = []
+
+        for page in range(21):
+            # parcours des pages par plages d'index (max index 3149)
+            first_index = page*150
+            last_index = first_index+150-1
+            search_range = f"{first_index}-{last_index}"
+
+            # API endpoint construction
+            search_url = API_URL+f"?region={region_code}&range={search_range}"
+            data = call_protected_api(search_url, access_token)
+            if data == None:
+                print(f"{region_name}: No more data found starting index {first_index}.")
+                break
+            # appending of the region data to the dictionary for referencing
+            data['region']=region_name
+            data['region_code']=region_code
+
+            # regroupement des jobs dans une liste de pages
+            data_regionpages_lst.append(data)
+
+        export_to_json(data_regionpages_lst, region_code)
 if __name__ == "__main__":
 
     # access token
