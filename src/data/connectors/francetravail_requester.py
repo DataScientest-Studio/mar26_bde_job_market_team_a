@@ -2,11 +2,12 @@ import requests
 import sys, os
 from pprint import pprint
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 from pathlib import Path
+import urllib.parse
 
 load_dotenv(".env")
 
@@ -90,14 +91,29 @@ def export_to_json(result_lst, region=''):
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_lst, file, indent=4, ensure_ascii=False)
 
-def gather_data_from_api(target_regions_lst, access_token):
-    # parcours des régions
+def get_publiee_depuis_arg_nb(latest_ft):
+
+    format = "%Y-%m-%dT%H:%M:%SZ"
+    now_utc = datetime.now(timezone(timedelta(hours=2))).strftime(format)
+    
+    # Formattage du delta entre now et la dernière requete en une valeur absolue
+    days_result_nb = abs((datetime.strptime(now_utc,format) - datetime.strptime(latest_ft,format)).days)
+    # Max value = 7
+    if days_result_nb > 7:
+        days_result_nb = 7
+
+    return days_result_nb
+
+def gather_data_from_api(target_regions_lst, access_token, update_bool=False, latest_ft=''):
+
+    # Parcours des régions
     for target_region in target_regions_lst:
         region_code = target_region['code']
         region_name = target_region['libelle']
         data_regionpages_lst = []
 
         for page in range(21):
+
             # parcours des pages par plages d'index (max index 3149)
             first_index = page*150
             last_index = first_index+150-1
@@ -105,27 +121,40 @@ def gather_data_from_api(target_regions_lst, access_token):
 
             # API endpoint construction
             search_url = API_URL+f"?region={region_code}&range={search_range}"
+            
+            # Ajout de l'argument publieeDepuis en cas d'update (depuis 7j max)
+            if update_bool==True:
+                nb_days = get_publiee_depuis_arg_nb(latest_ft)
+                publiee_depuis_arg = f"&publieeDepuis={nb_days}"
+                search_url = search_url+publiee_depuis_arg
+
+            # Lancement de la requête
             data = call_protected_api(search_url, access_token)
+
+            # Check de la reponse et du contenu renvoyé par l'API
             if data == None:
-                print(f"{region_name}: No more data found starting index {first_index}.")
+                print(f"{region_name} (code {region_code}): No data found starting index {first_index}.")
                 break
-            # appending of the region data to the dictionary for referencing
+
+            # Appending of the region data to the dictionary for referencing
             data['region']=region_name
             data['region_code']=region_code
 
-            # regroupement des jobs dans une liste de pages
+            # Regroupement des jobs dans une liste de pages
             data_regionpages_lst.append(data)
-
-            
-
         export_to_json(data_regionpages_lst, region_code)
-if __name__ == "__main__":
 
+
+def initialize(update_bool=False, latest_ft='' ):
     # access token
     access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
     print(f"Access Token: {access_token}")
 
     target_regions_lst = parse_region_codes()
-    gather_data_from_api(target_regions_lst, access_token)
+    gather_data_from_api(target_regions_lst, access_token, update_bool, latest_ft)
+
+if __name__ == "__main__":
+    initialize()
+
 
 

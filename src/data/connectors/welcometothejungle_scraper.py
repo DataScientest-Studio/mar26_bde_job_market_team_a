@@ -1,13 +1,16 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
-from scrapesearchpage import scrape_search_page_to_dict
-from scrapejob import get_jobinfo
-from scrape_entrypage import scrape_searchpages
+from src.data.connectors.scrapesearchpage import scrape_search_page_to_dict
+from src.data.connectors.scrapejob import get_jobinfo
+from src.data.connectors.scrape_entrypage import scrape_searchpages
 import yaml, json, pprint, os
 from pathlib import Path
+from dotenv import load_dotenv
 
-YAML_TAGS = "references/data_extraction/welcometothejungle/webscraping_metadata.yml"
+load_dotenv(".env")
+
+SCRAPING_TAGS_YAML = os.getenv("SCRAPING_TAGS")
 
 options = Options()
 options.add_argument("--headless=new")
@@ -34,20 +37,19 @@ def export_to_json(result_dict):
 
 def parse_yaml_scraping_classes():
     try:
-        with open(YAML_TAGS, "r") as f:
+        with open(SCRAPING_TAGS_YAML, "r") as f:
             scraping_dict=yaml.safe_load(f)
     except:
         print("Failed to load yaml tags file.")
     return scraping_dict
 
-def main():
+def initialize():
     try:
         
         scraping_dict = parse_yaml_scraping_classes()
         job_dicts_list=[]
         search_pages_dict = scrape_searchpages(driver,scraping_dict['entry_page'])
         
-        #TODO supprimer la collection targets vu qu'on n'a plus le choix des recherches à cause de welcome to the jungle
         for region in list(search_pages_dict.keys()):
             for search_text in list(search_pages_dict[region].keys()):
                 jobs_dict={}
@@ -81,4 +83,4 @@ def main():
         driver.quit()
 
 if __name__ == "__main__":
-    main()
+    initialize()
