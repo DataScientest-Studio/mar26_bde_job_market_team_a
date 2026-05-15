@@ -151,7 +151,7 @@ Step 2: convert to label
 """
 
 
-def retrieve_jobs_regression(engine) -> pd.DataFrame:
+def retrieve_jobs_regression(engine: Engine) -> pd.DataFrame:
     job_id = JobOffer.job_id.label("job_id")
     job_type_id = JobOffer.job_type_id.label("job_type_id")
     experience_years = JobOffer.experience_years.label("experience_years")
@@ -192,23 +192,16 @@ def generate_training_data(jobs: pd.DataFrame, engine: Engine) -> list[tuple]:
 
         # Negative examples
         for _ in range(5):
-            random_job = get_random_job(job["job_type_id"], engine)
+            random_job = get_random_job(job["job_type_id"], jobs, engine)
             training_data.append((user, random_job, relevance_score(user, random_job), 0))
 
     return training_data
 
-def get_random_job(job: pd.DataFrame, engine: Engine) -> dict:
-    # This function should return a random job from your dataset
-    query = select(JobOffer).order_by(func.random()).limit(1)
-    random_job = pd.read_sql(query, engine).iloc[0]
-    return {
-        "skills": ["random_skill"],
-        "location": "random_location",
-        "region": "random_region",
-        "salary": 50000,
-        "contract_type": "full-time"
-    }
-
+def get_random_job(job_type_id: int, jobs: pd.DataFrame, engine: Engine) -> pd.DataFrame:
+    query = select(JobOffer).where(JobOffer.job_type_id != job_type_id).order_by(func.random()).limit(5)
+    random_job_ids = [row.job_id for row in pd.read_sql(query, engine).itertuples()]
+    random_jobs = jobs.loc[jobs["job_id"].isin(random_job_ids)]
+    return random_jobs
 
 
 def skill_match_score(user_skills, job_skills) -> float:
