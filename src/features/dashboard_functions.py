@@ -1,6 +1,6 @@
 """
 Dashboard functions for job market data analytics.
-Uses Supabase Python client to execute queries against a PostgreSQL data warehouse.
+Builds SQLModel/SQLAlchemy statements executed by the API layer.
 
 Planned analytics:
 - tendances par secteur => statistiques généraux
@@ -14,102 +14,82 @@ Planned analytics:
     compétences de l'utilisateur => recommandation sur quels métiers correspondent le mieux
 """
 
-import os
-from supabase import create_client, Client
+from sqlalchemy import Integer, case, desc, func
+from sqlalchemy.sql import Select
+from sqlmodel import select
 
-# ---------------------------------------------------------------------------
-# Supabase client initialization
-# ---------------------------------------------------------------------------
-SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY: str = os.environ.get("SUPABASE_KEY", "")
+from src.api.models import Contract, Industry, JobOffer, JobType, Location, Salary
 
-supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+MIN_DASHBOARD_ANNUAL_SALARY = 10_000
+MAX_DASHBOARD_ANNUAL_SALARY = 200_000
 
 
-# ---------------------------------------------------------------------------
-# Helper — execute a named Supabase RPC function
-# ---------------------------------------------------------------------------
+def trends_by_sector_statement() -> Select:
+    sector = func.coalesce(Industry.industry_name, "Non renseigne").label("sector")
+    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
+    nb_offres = func.count().cast(Integer).label("nb_offres")
 
-def _run_rpc(fn_name: str, params: dict = None):
-    """
-    Execute a Supabase RPC function and return the data as a list of dicts.
-    Raises a RuntimeError if the response contains an error.
-    """
-    response = supabase_client.rpc(fn_name, params or {}).execute()
-    if hasattr(response, "error") and response.error:
-        raise RuntimeError(f"Supabase RPC error on '{fn_name}': {response.error}")
-    return response.data
-
-
-# ---------------------------------------------------------------------------
-# Dashboard functions
-# Each function calls a named PostgreSQL function exposed via Supabase RPC.
-# The SQL body of each function is documented below for reference.
-# ---------------------------------------------------------------------------
-
-def get_trends_by_sector() -> list[dict]:
-    """
-    Returns job offer trends grouped by industry sector and year.
-
-    Equivalent SQL (define as PostgreSQL function 'get_trends_by_sector'):
-        SELECT
-            i.name        AS sector,
-            EXTRACT(YEAR FROM f.published_date)::int AS year,
-            COUNT(*)      AS nb_offres
-        FROM fact_job_offers f
-        JOIN dim_industry i ON f.industry_id = i.industry_id
-        GROUP BY i.name, EXTRACT(YEAR FROM f.published_date)
-        ORDER BY nb_offres DESC;
-    """
-    return _run_rpc("get_trends_by_sector")
+    return (
+        select(sector, year, nb_offres)
+        .join(Industry, JobOffer.industry_id == Industry.industry_id)
+        .where(JobOffer.published_at.is_not(None))
+        .group_by(sector, year)
+        .order_by(desc(nb_offres))
+    )
 
 
-def get_trends_by_region() -> list[dict]:
-    """
-    Returns job offer trends grouped by region and year.
+def trends_by_region_statement() -> Select:
+    region = func.coalesce(Location.region, "Non renseigne").label("region")
+    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
+    nb_offres = func.count().cast(Integer).label("nb_offres")
 
-    Equivalent SQL (define as PostgreSQL function 'get_trends_by_region'):
-        SELECT
-            r.name        AS region,
-            EXTRACT(YEAR FROM f.published_date)::int AS year,
-            COUNT(*)      AS nb_offres
-        FROM fact_job_offers f
-        JOIN dim_region r ON f.region_id = r.region_id
-        GROUP BY r.name, EXTRACT(YEAR FROM f.published_date)
-        ORDER BY nb_offres DESC;
-    """
-    return _run_rpc("get_trends_by_region")
+    return (
+        select(region, year, nb_offres)
+        .join(Location, JobOffer.location_id == Location.location_id)
+        .where(JobOffer.published_at.is_not(None))
+        .group_by(region, year)
+        .order_by(desc(nb_offres))
+    )
 
 
-def get_trends_by_contract_type() -> list[dict]:
-    """
-    Returns job offer trends grouped by contract type and year.
+def trends_by_contract_type_statement() -> Select:
+    contract_type = func.coalesce(Contract.contract_type, "Non renseigne").label("contract_type")
+    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
+    nb_offres = func.count().cast(Integer).label("nb_offres")
 
-    Equivalent SQL (define as PostgreSQL function 'get_trends_by_contract_type'):
-        SELECT
-            c.name        AS contract_type,
-            EXTRACT(YEAR FROM f.published_date)::int AS year,
-            COUNT(*)      AS nb_offres
-        FROM fact_job_offers f
-        JOIN dim_contract_type c ON f.contract_type_id = c.contract_type_id
-        GROUP BY c.name, EXTRACT(YEAR FROM f.published_date)
-        ORDER BY nb_offres DESC;
-    """
-    return _run_rpc("get_trends_by_contract_type")
+    return (
+        select(contract_type, year, nb_offres)
+        .join(Contract, JobOffer.contract_type_id == Contract.contract_type_id)
+        .where(JobOffer.published_at.is_not(None))
+        .group_by(contract_type, year)
+        .order_by(desc(nb_offres))
+    )
 
 
-def get_salary_by_job() -> list[dict]:
-    """
-    Returns average salary grouped by job title and year.
+def salary_by_job_statement() -> Select:
+    job_title = func.coalesce(JobType.title, "Non renseigne").label("job_title")
+    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
+    salary_amount = (
+        (func.coalesce(Salary.salary_min, Salary.salary_max) + func.coalesce(Salary.salary_max, Salary.salary_min)) / 2
+    )
+    annual_salary_amount = (
+        case(
+            (Salary.frequency == "month", salary_amount * 12),
+            (Salary.frequency == "week", salary_amount * 52),
+            (Salary.frequency == "hour", salary_amount * 35 * 52),
+            else_=salary_amount,
+        )
+    )
+    avg_salary = func.round(func.avg(annual_salary_amount), 2).label("avg_salary")
+    nb_offres = func.count().cast(Integer).label("nb_offres")
 
-    Equivalent SQL (define as PostgreSQL function 'get_salary_by_job'):
-        SELECT
-            j.title       AS job_title,
-            EXTRACT(YEAR FROM f.published_date)::int AS year,
-            ROUND(AVG(f.salary)::numeric, 2) AS avg_salary
-        FROM fact_job_offers f
-        JOIN dim_job j ON f.job_id = j.job_id
-        GROUP BY j.title, EXTRACT(YEAR FROM f.published_date)
-        ORDER BY avg_salary DESC;
-    """
-    return _run_rpc("get_salary_by_job")
+    return (
+        select(job_title, year, avg_salary, nb_offres)
+        .join(JobType, JobOffer.job_type_id == JobType.job_type_id)
+        .join(Salary, JobOffer.salary_id == Salary.salary_id)
+        .where((Salary.salary_min.is_not(None) | Salary.salary_max.is_not(None)))
+        .where(annual_salary_amount.between(MIN_DASHBOARD_ANNUAL_SALARY, MAX_DASHBOARD_ANNUAL_SALARY))
+        .where(JobOffer.published_at.is_not(None))
+        .group_by(job_title, year)
+        .order_by(desc(avg_salary))
+    )

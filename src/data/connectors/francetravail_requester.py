@@ -17,7 +17,7 @@ TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL") # API's token endpoint
 API_BASE_URL = os.getenv("FRANCE_TRAVAIL_BASE_URL")
 SCOPES = os.getenv("FRANCE_TRAVAIL_SCOPE")
 
-REGION_CODES_PATH = "references/data_extraction/francetravail/region_codes.json"
+REGION_CODES_PATH = "references/data_extraction/france_travail/region_codes.json"
 API_URL = f"{API_BASE_URL}/offres/search"
 
 def get_access_token(client_id, client_secret, token_url):
@@ -82,11 +82,11 @@ def export_to_json(result_lst, region=''):
     src_dir = src_data_dir.parent
     project_root= src_dir.parent
 
-    data_dump_folder = project_root.joinpath("data/raw/francetravail")
+    data_dump_folder = project_root.joinpath("data/raw/france_travail")
     data_dump_folder.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = data_dump_folder / f"francetravail_region{region}_{timestamp}.json"
+    collection_date = datetime.now().strftime("%Y-%m-%d")
+    json_path = data_dump_folder / f"france_travail_{region}_{collection_date}.json"
 
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_lst, file, indent=4, ensure_ascii=False)

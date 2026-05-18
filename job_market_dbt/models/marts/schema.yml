@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: fct_job_offers
+  - name: fact_job_offers
     description: "Offres canoniques finales, une ligne par offre dedupliquee."
     columns:
       - name: job_id
@@ -40,7 +40,7 @@ models:
         tests:
           - relationships:
               arguments:
-                to: ref('fct_job_offers')
+                to: ref('fact_job_offers')
                 field: job_id
 
   - name: dim_company
@@ -96,7 +96,7 @@ models:
         tests:
           - relationships:
               arguments:
-                to: ref('fct_job_offers')
+                to: ref('fact_job_offers')
                 field: job_id
       - name: skill_id
         tests:
@@ -113,7 +113,7 @@ models:
         tests:
           - relationships:
               arguments:
-                to: ref('fct_job_offers')
+                to: ref('fact_job_offers')
                 field: job_id
       - name: advantage_id
         tests:

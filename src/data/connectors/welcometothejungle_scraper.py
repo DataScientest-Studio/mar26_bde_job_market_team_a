@@ -1,3 +1,7 @@
+import json
+import pprint
+
+import yaml
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
@@ -19,6 +23,7 @@ options.add_argument("--no-sandbox")
 driver = webdriver.Chrome(options=options)
 
 
+
 def export_to_json(result_dict):
     
     connectors_dir = Path(__file__).parent
@@ -26,11 +31,11 @@ def export_to_json(result_dict):
     src_dir = src_data_dir.parent
     project_root= src_dir.parent
 
-    data_dump_folder = project_root.joinpath("data/raw/welcometothejungle")
+    data_dump_folder = project_root.joinpath("data/raw/welcome_to_the_jungle")
     data_dump_folder.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path = data_dump_folder / f"welcometothejungle_{timestamp}.json"
+    collection_date = datetime.now().strftime("%Y-%m-%d")
+    json_path = data_dump_folder / f"welcome_to_the_jungle_{collection_date}.json"
 
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_dict, file, indent=4, ensure_ascii=False)
@@ -71,16 +76,18 @@ def initialize():
 
         for job, details in job_results_dict.items():
             print(f"\n{job}")
-            for k, v in details.items():
-                print(f"  {k}: {v}")
-
+            for key, value in details.items():
+                print(f"  {key}: {value}")
 
         pprint.pprint(job_results_dict)
-        export_to_json(job_results_dict)
-
-
+        return export_to_json(job_results_dict)
     finally:
         driver.quit()
+
+
+def main():
+    collect_welcome_to_the_jungle()
+
 
 if __name__ == "__main__":
     initialize()
