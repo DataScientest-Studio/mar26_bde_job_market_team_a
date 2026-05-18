@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from src.dashboard.api_client import load_lookups, load_ml_stats, post_api
+from src.dashboard.call_api import load_lookups, load_ml_stats, post_api
 from src.dashboard.ui import compact_currency, compact_number, lookup_options, metric_value, optional_select
 
 

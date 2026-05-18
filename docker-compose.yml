@@ -14,6 +14,23 @@ services:
       - ./src:/app/src:ro
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job_market_dashboard
+    env_file:
+      - .env
+    environment:
+      JOB_MARKET_API_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    volumes:
+      - ./src:/app/src:ro
+    command: streamlit run src/dashboard/streamlit_app.py --server.address=0.0.0.0 --server.port=8501
+
   postgres:
     image: postgres:16
     container_name: job_market_postgres
