@@ -8,6 +8,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 env/
+.airflow_venv/
 build/
 develop-eggs/
 dist/

@@ -402,6 +402,21 @@ Lancer l'API et le dashboard avec Docker :
 docker compose up -d api dashboard
 ```
 
+Lancer Airflow avec Docker :
+
+```
+make airflow
+```
+
+Airflow est disponible par défaut sur :
+
+```
+http://localhost:8080
+```
+
+Le DAG principal est `job_market_batch_pipeline`. Il orchestre la collecte, le
+chargement raw, dbt, les tests dbt et l'entraînement ML.
+
 Le dashboard est disponible par défaut sur :
 
 ```
@@ -452,6 +467,7 @@ Le script `scripts/run_dbt.py` charge automatiquement le fichier `.env` avant d'
 Exemple de configuration :
 
 - [.env.example](.env.example)
+- [airflow/.env.example](airflow/.env.example)
 
 Variables principales :
 
@@ -477,6 +493,8 @@ Variables principales :
 - `JOB_MARKET_API_URL`
 - `PGADMIN_PORT`
 - `SELENIUM_HEADLESS`
+
+Les variables Airflow sont documentées dans [airflow/README.md](airflow/README.md).
 
 `DBT_TARGET=dev` pointe vers PostgreSQL local.
 
