@@ -1,8 +1,8 @@
 """
-Helpers utilises par l'API de prediction.
+Helpers utilisés par l'API de prédiction.
 
-Important : on garde ici une V0 volontairement simple. L'API appelle le modele
-entraine depuis PostgreSQL dans features_preparation.py.
+Important : on garde ici une V0 volontairement simple. L'API appelle le modèle
+entraîné depuis PostgreSQL dans features_preparation.py.
 """
 
 from __future__ import annotations
@@ -25,14 +25,14 @@ from src.models.features_preparation import (
 @lru_cache(maxsize=1)
 def load_model_artifacts():
     """
-    Charge les artefacts ML utilises par l'API.
+    Charge les artefacts ML utilisés par l'API.
 
     Flux normal :
-    - make ml-train cree models/job_market_model_artifacts.pkl ;
-    - l'API charge ce fichier et le garde en cache memoire.
+    - make ml-train crée models/job_market_model_artifacts.pkl ;
+    - l'API charge ce fichier et le garde en cache mémoire.
 
     Fallback dev :
-    - si le fichier n'existe pas encore, on entraine depuis PostgreSQL et on
+    - si le fichier n'existe pas encore, on entraîne depuis PostgreSQL et on
       sauvegarde les artefacts pour les prochains appels.
     """
     try:

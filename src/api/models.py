@@ -45,6 +45,15 @@ class Industry(SQLModel, table=True):
     industry_name: str | None = None
 
 
+class Education(SQLModel, table=True):
+    __tablename__ = "dim_education"
+    __table_args__ = {"schema": "analytics"}
+
+    education_id: str = Field(primary_key=True)
+    title: str | None = None
+    education_field: str | None = None
+
+
 class Salary(SQLModel, table=True):
     __tablename__ = "dim_salary"
     __table_args__ = {"schema": "analytics"}
@@ -76,6 +85,14 @@ class Skill(SQLModel, table=True):
     skill_category: str
 
 
+class Advantage(SQLModel, table=True):
+    __tablename__ = "dim_advantage"
+    __table_args__ = {"schema": "analytics"}
+
+    advantage_id: str = Field(primary_key=True)
+    advantage_name: str
+
+
 class JobSkill(SQLModel, table=True):
     __tablename__ = "bridge_job_skill"
     __table_args__ = {"schema": "analytics"}
@@ -83,6 +100,15 @@ class JobSkill(SQLModel, table=True):
     job_skill_id: str = Field(primary_key=True)
     job_id: str
     skill_id: str
+
+
+class JobAdvantage(SQLModel, table=True):
+    __tablename__ = "bridge_job_advantage"
+    __table_args__ = {"schema": "analytics"}
+
+    job_advantage_id: str = Field(primary_key=True)
+    job_id: str
+    advantage_id: str
 
 
 class JobOffer(SQLModel, table=True):

@@ -1,53 +1,53 @@
 """
-Preparation ML pour le projet Job Market.
+Préparation ML pour le projet Job Market.
 
-Ce fichier sert de support de conception pour expliquer le modele sans aller trop
-loin dans l'implementation. Il suit les idees de la fiche ML :
+Ce fichier sert de support de conception pour expliquer le modèle sans aller trop
+loin dans l'implémentation. Il suit les idées de la fiche ML :
 
-- apprentissage supervise : on predit une variable cible connue ;
-- apprentissage non supervise : on cherche des groupes sans variable cible ;
-- train/test split : on garde une partie des donnees pour evaluer le modele ;
-- metriques : elles dependent du type de probleme.
+- apprentissage supervisé : on prédit une variable cible connue ;
+- apprentissage non supervisé : on cherche des groupes sans variable cible ;
+- train/test split : on garde une partie des données pour évaluer le modèle ;
+- métriques : elles dépendent du type de problème.
 
 Dans notre projet, il y a deux pistes ML possibles.
 
-1. Recommendation d'offres
-   Type de probleme :
-   - classification supervisee : on predit si une offre est pertinente pour un
+1. Recommandation d'offres
+   Type de problème :
+   - classification supervisée : on prédit si une offre est pertinente pour un
      profil candidat.
    - comme le projet n'a pas de vrais clics/candidatures, on fabrique des labels
-     synthetiques depuis les offres PostgreSQL.
+     synthétiques depuis les offres PostgreSQL.
 
    Variable cible possible :
    - label = 1 si l'offre est pertinente pour un profil candidat ;
    - label = 0 sinon.
 
    Variables explicatives possibles :
-   - competences presentes dans l'offre, encodees en multi-hot ;
-   - annees d'experience demandees ;
+   - compétences présentes dans l'offre, encodées en multi-hot ;
+   - années d'expérience demandées ;
    - salaire moyen ou tranche de salaire ;
    - type de contrat ;
-   - remote / teletravail ;
+   - remote / télétravail ;
    - localisation ;
-   - secteur d'activite ;
+   - secteur d'activité ;
    - titre du poste.
 
-   Algo choisi pour une premiere version simple :
-   - LogisticRegression pour predire une probabilite de pertinence.
-   - NearestNeighbors sert seulement de prefiltre pour ne pas scorer toutes les
+   Algo choisi pour une première version simple :
+   - LogisticRegression pour prédire une probabilité de pertinence.
+   - NearestNeighbors sert seulement de préfiltre pour ne pas scorer toutes les
      offres quand la base grossit.
-   - Le modele est entraine avec .fit et utilise avec .predict_proba.
+   - Le modèle est entraîné avec .fit et utilisé avec .predict_proba.
 
 2. Prediction de salaire
-   Type de probleme :
-   - regression supervisee.
+   Type de problème :
+   - régression supervisée.
 
    Variable cible :
-   - salaire annuel estime.
+   - salaire annuel estimé.
 
    Variables explicatives possibles :
    - titre du poste ;
-   - competences ;
+   - compétences ;
    - experience ;
    - localisation ;
    - type de contrat ;
@@ -56,11 +56,11 @@ Dans notre projet, il y a deux pistes ML possibles.
 
    Algo simple possible :
    - DecisionTreeRegressor, comme dans la fiche ML.
-   - Avantage : lisible, facile a expliquer.
+   - Avantage : lisible, facile à expliquer.
    - Limite : risque de surapprentissage si l'arbre est trop profond.
 
-Ce fichier reste volontairement leger : il documente le raisonnement ML et
-prepare un modele simple a partir des tables PostgreSQL analytics.
+Ce fichier reste volontairement léger : il documente le raisonnement ML et
+prépare un modèle simple à partir des tables PostgreSQL analytics.
 """
 
 from __future__ import annotations
@@ -96,15 +96,15 @@ MODEL_ARTIFACTS_FILENAME = "job_market_model_artifacts.pkl"
 @dataclass
 class JobMarketModelArtifacts:
     """
-    Tous les objets crees pendant l'entrainement ML.
+    Tous les objets créés pendant l'entraînement ML.
 
-    - training_df : donnees nettoyees issues de PostgreSQL ;
-    - mlb : encodeur multi-hot des competences ;
+    - training_df : données nettoyées issues de PostgreSQL ;
+    - mlb : encodeur multi-hot des compétences ;
     - similarity_scaler / salary_scaler : standardisation des variables ;
     - recommendation_scaler : standardisation des variables user-job ;
-    - similarity_model : modele de voisins pour les recommandations ;
-    - recommendation_model : classification supervisee de pertinence ;
-    - salary_model : modele supervise de regression pour le salaire.
+    - similarity_model : modèle de voisins pour les recommandations ;
+    - recommendation_model : classification supervisée de pertinence ;
+    - salary_model : modèle supervisé de régression pour le salaire.
     """
 
     training_df: pd.DataFrame
@@ -123,9 +123,9 @@ class JobMarketModelArtifacts:
 
 def get_model_dir(model_dir: str | Path | None = None) -> Path:
     """
-    Repertoire des artefacts ML.
+    Répertoire des artefacts ML.
 
-    Priorite :
+    Priorité :
     - argument explicite ;
     - variable d'environnement MODEL_DIR ;
     - dossier local models/.
@@ -140,9 +140,9 @@ def get_model_artifacts_path(model_dir: str | Path | None = None) -> Path:
 
 def save_job_market_artifacts(artifacts: JobMarketModelArtifacts, model_dir: str | Path | None = None) -> Path:
     """
-    Sauvegarde l'artefact complet utilise par l'API.
+    Sauvegarde l'artefact complet utilisé par l'API.
 
-    Les fichiers separes restent utiles pour inspecter rapidement les objets,
+    Les fichiers séparés restent utiles pour inspecter rapidement les objets,
     mais l'API charge principalement job_market_model_artifacts.pkl.
     """
     model_path = get_model_dir(model_dir)
@@ -162,7 +162,7 @@ def save_job_market_artifacts(artifacts: JobMarketModelArtifacts, model_dir: str
 
 def load_job_market_artifacts(model_dir: str | Path | None = None) -> JobMarketModelArtifacts:
     """
-    Charge les artefacts entraines par make ml-train.
+    Charge les artefacts entraînés par make ml-train.
     """
     artifacts_path = get_model_artifacts_path(model_dir)
     if not artifacts_path.exists():
@@ -175,12 +175,12 @@ def load_job_market_artifacts(model_dir: str | Path | None = None) -> JobMarketM
 
 def find_top_skills(limit: int = 50) -> list[str]:
     """
-    Liste les competences les plus utiles pour limiter la dimension du modele.
+    Liste les compétences les plus utiles pour limiter la dimension du modèle.
 
-    Idee ML :
-    - si on garde toutes les competences, on cree trop de colonnes ;
-    - on limite donc le vocabulaire aux competences les plus frequentes ;
-    - les autres competences peuvent etre regroupees dans une categorie "other".
+    Idée ML :
+    - si on garde toutes les compétences, on crée trop de colonnes ;
+    - on limite donc le vocabulaire aux compétences les plus fréquentes ;
+    - les autres compétences peuvent être regroupées dans une catégorie "other".
 
     Les valeurs viennent de PostgreSQL :
     - analytics.bridge_job_skill ;
@@ -206,12 +206,12 @@ def find_top_skills(limit: int = 50) -> list[str]:
 
 def retrieve_features() -> pd.DataFrame:
     """
-    Recupere les variables explicatives necessaires au modele de similarite.
+    Récupère les variables explicatives nécessaires au modèle de similarité.
 
     Structure attendue :
     - id : identifiant de l'offre ;
-    - skills : liste de competences ;
-    - experience : experience demandee en annees ;
+    - skills : liste de compétences ;
+    - experience : expérience demandée en années ;
     - salary : salaire annuel moyen.
     - title/location/contract/remote/industry/education : variables de matching.
 
@@ -309,14 +309,14 @@ def retrieve_features() -> pd.DataFrame:
 
 def clean_training_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Nettoyage des donnees avant entrainement.
+    Nettoyage des données avant entraînement.
 
-    Etape "suppression/traitement des nulls" de la fiche ML :
-    - salaire : variable cible pour la regression, donc on supprime les lignes
+    Étape "suppression/traitement des nulls" de la fiche ML :
+    - salaire : variable cible pour la régression, donc on supprime les lignes
       sans salaire exploitable ;
-    - experience : valeur numerique manquante remplacee par 0 an ;
-    - competences : suppression des valeurs vides, puis suppression des offres
-      sans competence.
+    - experience : valeur numérique manquante remplacée par 0 an ;
+    - compétences : suppression des valeurs vides, puis suppression des offres
+      sans compétence.
     """
     cleaned = df.copy()
     cleaned["experience"] = pd.to_numeric(cleaned["experience"], errors="coerce").fillna(0)
@@ -335,11 +335,11 @@ def encode_experience(years: float) -> int:
     Transforme une variable quantitative en variable ordinale.
 
     Variable explicative :
-    - experience demandee.
+    - expérience demandée.
 
     Encodage :
     - 0 = junior ;
-    - 1 = intermediaire ;
+    - 1 = intermédiaire ;
     - 2 = senior.
     """
     if years <= 2:
@@ -354,12 +354,12 @@ def salary_bucket(salary: float) -> int:
     Transforme le salaire en tranche.
 
     Variable explicative :
-    - niveau de remuneration de l'offre.
+    - niveau de rémunération de l'offre.
 
     Encodage :
     - 0 = salaire bas ;
     - 1 = salaire moyen ;
-    - 2 = salaire eleve.
+    - 2 = salaire élevé.
     """
     if salary < 30000:
         return 0
@@ -381,8 +381,8 @@ def _text_match_score(user_value, job_value) -> float:
     """
     Score simple pour les variables qualitatives textuelles.
 
-    On ne fait pas encore de NLP avance : pour une V0, on compare les libelles
-    nettoyes et on calcule un petit recouvrement de mots.
+    On ne fait pas encore de NLP avancé : pour une V0, on compare les libellés
+    nettoyés et on calcule un petit recouvrement de mots.
     """
     user_text = _normalize_text(user_value)
     job_text = _normalize_text(job_value)
@@ -398,12 +398,12 @@ def _text_match_score(user_value, job_value) -> float:
 
 def build_pair_features(user_input: dict, jobs_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Cree X pour un couple profil candidat / offre.
+    Crée X pour un couple profil candidat / offre.
 
-    Ces variables explicatives correspondent a une logique de recommandation :
-    - proximite des competences ;
-    - ecart d'experience ;
-    - ecart de salaire ;
+    Ces variables explicatives correspondent à une logique de recommandation :
+    - proximité des compétences ;
+    - écart d'expérience ;
+    - écart de salaire ;
     - correspondance titre/localisation/contrat/remote/secteur/formation.
     """
     user_skills = {str(skill).strip().lower() for skill in user_input.get("skills", []) if str(skill).strip()}
@@ -456,15 +456,15 @@ def build_recommendation_training_set(
     negative_samples: int = 3,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Construit un dataset supervise pour la recommandation.
+    Construit un dataset supervisé pour la recommandation.
 
-    Comme on n'a pas de vrais clics/candidatures, on cree des labels synthetiques
+    Comme on n'a pas de vrais clics/candidatures, on crée des labels synthétiques
     depuis PostgreSQL :
-    - label 1 : le profil candidat derive d'une offre correspond a cette offre ;
-    - label 0 : ce meme profil est associe a quelques offres aleatoires.
+    - label 1 : le profil candidat dérivé d'une offre correspond à cette offre ;
+    - label 0 : ce même profil est associé à quelques offres aléatoires.
 
     Cela donne une vraie classification binaire avec X, y, .fit et .predict_proba,
-    tout en restant base uniquement sur les offres stockees en base.
+    tout en restant basé uniquement sur les offres stockées en base.
     """
     rng = np.random.default_rng(42)
     feature_blocks: list[pd.DataFrame] = []
@@ -501,27 +501,27 @@ def prepare_model_features(
     MultiLabelBinarizer,
 ]:
     """
-    Prepare les matrices X pour les modeles.
+    Prépare les matrices X pour les modèles.
 
     Variables explicatives retenues dans cette version :
-    - competences : multi-hot encoding avec MultiLabelBinarizer ;
-    - experience : variable ordinale junior/intermediaire/senior ;
+    - compétences : multi-hot encoding avec MultiLabelBinarizer ;
+    - experience : variable ordinale junior/intermédiaire/senior ;
     - salaire attendu : variable ordinale par tranche pour la recommandation.
 
     Encodage :
-    - MultiLabelBinarizer transforme une liste de competences en colonnes 0/1.
+    - MultiLabelBinarizer transforme une liste de compétences en colonnes 0/1.
 
     Standardisation :
-    - StandardScaler centre/reduit les variables avant les modeles a distance.
+    - StandardScaler centre/réduit les variables avant les modèles à distance.
 
     Pourquoi deux matrices ?
-    - recommendation : utilise competences + experience + tranche de salaire ;
-    - prediction de salaire : utilise competences + experience, car le salaire
-      est la variable cible y et ne doit pas etre dans X.
+    - recommendation : utilise compétences + expérience + tranche de salaire ;
+    - prédiction de salaire : utilise compétences + expérience, car le salaire
+      est la variable cible y et ne doit pas être dans X.
 
     Pourquoi standardiser ?
-    - le modele compare les offres avec des distances ;
-    - les variables numeriques doivent donc etre mises sur une echelle comparable.
+    - le modèle compare les offres avec des distances ;
+    - les variables numériques doivent donc être mises sur une échelle comparable.
     """
     prepared = clean_training_data(df)
     top_skills = set(find_top_skills(limit=SKILL_LIMIT))
@@ -558,9 +558,9 @@ def prepare_model_features(
 
 def evaluate_recommendation_model(recommendation_X: pd.DataFrame, recommendation_y: pd.Series) -> dict[str, float]:
     """
-    Evalue le modele de recommandation avec un train/test split.
+    Évalue le modèle de recommandation avec un train/test split.
 
-    Le scaler est entraine uniquement sur X_train pour eviter une fuite
+    Le scaler est entraîné uniquement sur X_train pour éviter une fuite
     d'information depuis le jeu de test.
     """
     stratify = recommendation_y if recommendation_y.nunique() > 1 else None
@@ -590,7 +590,7 @@ def evaluate_recommendation_model(recommendation_X: pd.DataFrame, recommendation
 
 def evaluate_salary_model(salary_X: pd.DataFrame, salary_y: pd.Series) -> dict[str, float]:
     """
-    Evalue le modele de salaire avec un train/test split.
+    Évalue le modèle de salaire avec un train/test split.
     """
     X_train, X_test, y_train, y_test = train_test_split(
         salary_X,
@@ -618,7 +618,7 @@ def evaluate_salary_model(salary_X: pd.DataFrame, salary_y: pd.Series) -> dict[s
 
 def fit_similarity_model(similarity_X_scaled: pd.DataFrame, n_neighbors: int) -> NearestNeighbors:
     """
-    Entraine le prefiltre de voisins sur toutes les offres.
+    Entraîne le préfiltre de voisins sur toutes les offres.
     """
     effective_neighbors = min(n_neighbors, len(similarity_X_scaled))
     model = NearestNeighbors(n_neighbors=effective_neighbors, metric="euclidean")
@@ -628,7 +628,7 @@ def fit_similarity_model(similarity_X_scaled: pd.DataFrame, n_neighbors: int) ->
 
 def fit_recommendation_model(recommendation_X: pd.DataFrame, recommendation_y: pd.Series) -> tuple[LogisticRegression, StandardScaler, pd.DataFrame]:
     """
-    Entraine le modele final de recommandation sur toutes les donnees.
+    Entraîne le modèle final de recommandation sur toutes les données.
     """
     scaler = StandardScaler()
     X_scaled = pd.DataFrame(scaler.fit_transform(recommendation_X), columns=recommendation_X.columns)
@@ -640,7 +640,7 @@ def fit_recommendation_model(recommendation_X: pd.DataFrame, recommendation_y: p
 
 def fit_salary_model(salary_X_scaled: pd.DataFrame, salary_y: pd.Series) -> KNeighborsRegressor:
     """
-    Entraine le modele final de salaire sur toutes les donnees.
+    Entraîne le modèle final de salaire sur toutes les données.
     """
     n_neighbors = min(10, len(salary_X_scaled))
     model = KNeighborsRegressor(n_neighbors=n_neighbors, weights="distance")
@@ -654,33 +654,33 @@ def train_job_market_models(
     model_dir: str | Path | None = None,
 ) -> JobMarketModelArtifacts:
     """
-    Entraine les modeles a partir des offres PostgreSQL.
+    Entraîne les modèles à partir des offres PostgreSQL.
 
     Algo choisi pour les recommandations :
-    - LogisticRegression, classification supervisee avec labels synthetiques ;
-    - NearestNeighbors sert seulement a preselectionner les offres candidates.
+    - LogisticRegression, classification supervisée avec labels synthétiques ;
+    - NearestNeighbors sert seulement à présélectionner les offres candidates.
 
     Algo choisi pour le salaire :
-    - KNeighborsRegressor, regression supervisee simple avec y = salaire annuel.
+    - KNeighborsRegressor, régression supervisée simple avec y = salaire annuel.
 
     Pourquoi cet algo ?
     - le projet n'a pas de labels utilisateurs pour dire "bonne/mauvaise offre" ;
-    - on peut quand meme apprendre sur les offres PostgreSQL existantes ;
-    - simple a expliquer dans une presentation ;
-    - suffisant pour une premiere version sans labels utilisateurs.
+    - on peut quand même apprendre sur les offres PostgreSQL existantes ;
+    - simple à expliquer dans une présentation ;
+    - suffisant pour une première version sans labels utilisateurs.
 
     Appels ML explicites :
-    - train_test_split(...) pour evaluer les modeles ;
-    - .fit(...) pour entrainer les modeles ;
+    - train_test_split(...) pour évaluer les modèles ;
+    - .fit(...) pour entraîner les modèles ;
     - .predict_proba(...) classe les recommandations ;
-    - .predict(...) est utilise par predict_salary_from_profile().
+    - .predict(...) est utilisé par predict_salary_from_profile().
 
-    Apres evaluation, les modeles sauvegardes sont reentraines sur 100% des
-    donnees pour maximiser les exemples disponibles cote API.
+    Après évaluation, les modèles sauvegardés sont réentraînés sur 100% des
+    données pour maximiser les exemples disponibles côté API.
     """
     training_df = retrieve_features() if df is None else df.copy()
     if training_df.empty:
-        raise ValueError("Impossible d'entrainer un modele sur un dataset vide.")
+        raise ValueError("Impossible d'entraîner un modèle sur un dataset vide.")
 
     (
         training_df,
@@ -728,9 +728,9 @@ def train_job_market_models(
 
 def encode_user_input(user_input: dict, mlb: MultiLabelBinarizer) -> pd.DataFrame:
     """
-    Encode un profil candidat dans le meme format que les offres.
+    Encode un profil candidat dans le même format que les offres.
 
-    Entree attendue :
+    Entrée attendue :
     {
         "skills": ["python", "sql"],
         "experience": 3,
@@ -752,7 +752,7 @@ def encode_user_input(user_input: dict, mlb: MultiLabelBinarizer) -> pd.DataFram
 
 def transform_similarity_input(user_input: dict, artifacts: JobMarketModelArtifacts) -> pd.DataFrame:
     """
-    Standardise le profil candidat pour le modele de recommandation.
+    Standardise le profil candidat pour le modèle de recommandation.
     """
     user_vector = encode_user_input(user_input, artifacts.mlb)
     scaled = artifacts.similarity_scaler.transform(user_vector[artifacts.similarity_columns])
@@ -761,7 +761,7 @@ def transform_similarity_input(user_input: dict, artifacts: JobMarketModelArtifa
 
 def transform_salary_input(user_input: dict, artifacts: JobMarketModelArtifacts) -> pd.DataFrame:
     """
-    Standardise le profil candidat pour le modele de prediction de salaire.
+    Standardise le profil candidat pour le modèle de prédiction de salaire.
     """
     user_vector = encode_user_input(user_input, artifacts.mlb)
     scaled = artifacts.salary_scaler.transform(user_vector[artifacts.salary_columns])
@@ -778,11 +778,11 @@ def get_similar_jobs(
 
     Principe :
     - on encode le candidat comme une offre ;
-    - on calcule les distances avec les offres PostgreSQL encodees ;
+    - on calcule les distances avec les offres PostgreSQL encodées ;
     - on garde les offres les plus proches.
 
-    Ce n'est pas encore une recommandation supervisee. C'est une reduction de
-    l'espace de recherche avant une future logique plus avancee.
+    Ce n'est pas encore une recommandation supervisée. C'est une réduction de
+    l'espace de recherche avant une future logique plus avancée.
     """
     user_vector_scaled = transform_similarity_input(user_input, artifacts)
     effective_limit = min(max(limit, 1), len(artifacts.training_df))
@@ -798,12 +798,12 @@ def get_title_matched_jobs(
     limit: int = 50,
 ) -> pd.DataFrame:
     """
-    Recupere des offres candidates a partir de l'intitule recherche.
+    Récupère des offres candidates à partir de l'intitulé recherché.
 
-    Le prefiltre de similarite utilise surtout competences, experience et
-    salaire. Cette fonction ajoute un deuxieme rappel base sur le titre pour
-    eviter de recommander un metier hors sujet quand les competences sont
-    generiques.
+    Le préfiltre de similarité utilise surtout compétences, expérience et
+    salaire. Cette fonction ajoute un deuxième rappel basé sur le titre pour
+    éviter de recommander un métier hors sujet quand les compétences sont
+    génériques.
     """
     if not _normalize_text(user_input.get("job_title")):
         return artifacts.training_df.iloc[0:0].copy()
@@ -837,12 +837,12 @@ def predict_relevance_for_jobs(
     artifacts: JobMarketModelArtifacts,
 ) -> pd.DataFrame:
     """
-    Score les offres candidates avec le modele de recommandation.
+    Score les offres candidates avec le modèle de recommandation.
 
-    C'est la partie prediction de la recommandation :
-    - X user-job est cree avec build_pair_features ;
-    - X est standardise avec le scaler appris au .fit ;
-    - recommendation_model.predict_proba(X) renvoie la probabilite de label 1.
+    C'est la partie prédiction de la recommandation :
+    - X user-job est créé avec build_pair_features ;
+    - X est standardisé avec le scaler appris au .fit ;
+    - recommendation_model.predict_proba(X) renvoie la probabilité de label 1.
     """
     if jobs_df.empty:
         return jobs_df.copy()
@@ -870,12 +870,12 @@ def predict_relevance_for_jobs(
 
 def predict_salary_from_profile(user_input: dict, artifacts: JobMarketModelArtifacts) -> float:
     """
-    Predire un salaire avec le modele supervise.
+    Prédire un salaire avec le modèle supervisé.
 
-    C'est l'etape .predict(...) attendue dans une logique ML classique :
-    - X candidat est encode ;
-    - X candidat est standardise ;
-    - salary_model.predict(X) renvoie le salaire annuel estime.
+    C'est l'étape .predict(...) attendue dans une logique ML classique :
+    - X candidat est encodé ;
+    - X candidat est standardisé ;
+    - salary_model.predict(X) renvoie le salaire annuel estimé.
     """
     user_vector_scaled = transform_salary_input(user_input, artifacts)
     return float(artifacts.salary_model.predict(user_vector_scaled)[0])

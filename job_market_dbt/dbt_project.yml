@@ -41,6 +41,6 @@ models:
     staging:
       +materialized: ephemeral
     intermediate:
-      +materialized: table
+      +materialized: ephemeral
     marts:
       +materialized: table

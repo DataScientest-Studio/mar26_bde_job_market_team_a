@@ -21,7 +21,7 @@ def scrape_searchpages(driver, scraping_classes):
     
     soup = BeautifulSoup(driver.page_source, "html.parser")
     
-    jobregion_block_elements = soup.select(f'div.{scraping_classes['entry_page_region_block_class']}')
+    jobregion_block_elements = soup.select(f"div.{scraping_classes['entry_page_region_block_class']}")
    
     for searchregion_block in jobregion_block_elements:## TODO à modifier pour réduire le temps de test
             
