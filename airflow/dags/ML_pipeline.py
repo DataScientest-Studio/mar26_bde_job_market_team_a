@@ -5,7 +5,8 @@ from pathlib import Path
 import joblib
 
 from src.database import create_engine
-from src.models.train_models import train_clustering_model, retrieve_features_clustering
+from src.models.features_prep_clustering import retrieve_features_clustering
+from src.models.train_models import train_clustering_model
 
 @dag(schedule="@weekly", start_date=datetime(2026, 5, 4))
 def ml_workflow():
@@ -13,13 +14,17 @@ def ml_workflow():
     def train_clustering():
         engine = create_engine()
         df = retrieve_features_clustering(engine)
-        kmeans, scaler, mlb, df = train_clustering_model(df)
+        kmeans, scaler, mlbs, df = train_clustering_model(engine, df)
         return {
             "kmeans": kmeans,
             "scaler": scaler,
-            "mlb": mlb,
+            "mlbs": mlbs,
             "df": df[["job_id", "cluster"]]
         }
+
+    @task
+    def train_regression():
+        pass
 
     @task
     def save_model(model: dict):
@@ -28,7 +33,7 @@ def ml_workflow():
         time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         joblib.dump(model["kmeans"], f"{directory}/kmeans_{time_stamp}.pkl")
         joblib.dump(model["scaler"], f"{directory}/scaler_{time_stamp}.pkl")
-        joblib.dump(model["mlb"], f"{directory}/mlb_{time_stamp}.pkl")
+        joblib.dump(model["mlbs"], f"{directory}/mlbs_{time_stamp}.pkl")
         joblib.dump(model["df"], f"{directory}/df_{time_stamp}.pkl")
 
     model = train_clustering()
