@@ -14,7 +14,7 @@
 with attributes as (
     select
         *,
-        lower(coalesce(salary_raw, '')) as salary_text
+        lower(replace(coalesce(salary_raw, ''), '€', ' eur')) as salary_text
     from {{ ref('int_primary_offer_attributes') }}
 ),
 
