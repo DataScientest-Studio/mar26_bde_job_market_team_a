@@ -7,9 +7,8 @@ from airflow.operators.bash import BashOperator
 from airflow.utils.trigger_rule import TriggerRule
 
 
-PROJECT_DIR = "/opt/airflow/project"
-VENV_DIR = f"{PROJECT_DIR}/.airflow_venv"
-PYTHON_BIN = f"{VENV_DIR}/bin/python"
+PIPELINE_CONTAINER = "job_market_pipeline"
+DOCKER_SERVICES = "job_market_postgres job_market_pipeline"
 
 DEFAULT_ARGS = {
     "owner": "job-market",
@@ -19,8 +18,8 @@ DEFAULT_ARGS = {
 }
 
 
-def project_command(command: str) -> str:
-    return f"cd {PROJECT_DIR} && {command}"
+def pipeline_command(command: str) -> str:
+    return f"docker exec {PIPELINE_CONTAINER} {command}"
 
 
 with DAG(
@@ -33,49 +32,54 @@ with DAG(
     max_active_runs=1,
     tags=["job-market", "batch", "dbt", "ml"],
 ) as dag:
-    install_project_dependencies = BashOperator(
-        task_id="install_project_dependencies",
-        bash_command=project_command(
-            f"python -m venv {VENV_DIR} && "
-            f"{PYTHON_BIN} -m pip install --upgrade pip && "
-            f"{PYTHON_BIN} -m pip install -r requirements.txt"
-        ),
+    start_docker_services = BashOperator(
+        task_id="start_docker_services",
+        bash_command=f"docker start {DOCKER_SERVICES}",
     )
-    install_project_dependencies.as_setup()
+    start_docker_services.as_setup()
 
     collect_france_travail = BashOperator(
         task_id="collect_france_travail",
-        bash_command=project_command(f"{PYTHON_BIN} src/data/make_dataset.py --source france_travail"),
+        bash_command=pipeline_command("python src/data/make_dataset.py --source francetravail --update"),
     )
 
     collect_welcome_to_the_jungle = BashOperator(
         task_id="collect_welcome_to_the_jungle",
-        bash_command=project_command(f"{PYTHON_BIN} src/data/make_dataset.py --source welcome"),
+        bash_command=pipeline_command("python src/data/make_dataset.py --source welcometothejungle --update"),
     )
 
-    load_raw_to_postgres = BashOperator(
-        task_id="load_raw_to_postgres",
-        bash_command=project_command(f"{PYTHON_BIN} src/data/normalizers/load_raw_to_postgres.py --source all"),
+    load_raw_france_travail = BashOperator(
+        task_id="load_raw_france_travail",
+        bash_command=pipeline_command("python src/data/normalizers/load_raw_to_postgres.py --source francetravail"),
+        trigger_rule=TriggerRule.ALL_DONE,
+    )
+
+    load_raw_welcome_to_the_jungle = BashOperator(
+        task_id="load_raw_welcome_to_the_jungle",
+        bash_command=pipeline_command("python src/data/normalizers/load_raw_to_postgres.py --source welcometothejungle"),
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
     dbt_run = BashOperator(
         task_id="dbt_run",
-        bash_command=project_command(f"{PYTHON_BIN} scripts/run_dbt.py run"),
+        bash_command=pipeline_command("python scripts/run_dbt.py run"),
+        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
     )
 
     dbt_test = BashOperator(
         task_id="dbt_test",
-        bash_command=project_command(f"{PYTHON_BIN} scripts/run_dbt.py test"),
+        bash_command=pipeline_command("python scripts/run_dbt.py test"),
     )
 
     train_ml_models = BashOperator(
         task_id="train_ml_models",
-        bash_command=project_command(
-            f"{PYTHON_BIN} -m src.models.train_models --model-dir models --n-neighbors ${{ML_NEIGHBORS:-50}}"
+        bash_command=pipeline_command(
+            "python -m src.models.train_models --model-dir models --n-neighbors ${ML_NEIGHBORS:-50}"
         ),
     )
 
-    install_project_dependencies >> [collect_france_travail, collect_welcome_to_the_jungle]
-    [collect_france_travail, collect_welcome_to_the_jungle] >> load_raw_to_postgres
-    load_raw_to_postgres >> dbt_run >> dbt_test >> train_ml_models
+    start_docker_services >> [collect_france_travail, collect_welcome_to_the_jungle]
+    collect_france_travail >> load_raw_france_travail
+    collect_welcome_to_the_jungle >> load_raw_welcome_to_the_jungle
+    [load_raw_france_travail, load_raw_welcome_to_the_jungle] >> dbt_run
+    dbt_run >> dbt_test >> train_ml_models

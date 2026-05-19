@@ -4,16 +4,15 @@ Ce dossier contient le microservice Airflow du projet Job Market.
 
 ## Contenu
 
-- `Dockerfile` : image Airflow custom avec Chromium pour Selenium
+- `Dockerfile` : image Airflow custom avec le client Docker
 - `requirements.txt` : dépendances propres à Airflow
 - `dags/` : DAGs Airflow
 - `.env.example` : configuration du service Airflow
 
-Airflow est volontairement séparé des dépendances applicatives du projet. Le
-projet utilise SQLAlchemy 2, alors qu'Airflow 2.10.x garde ses propres
-contraintes. Le DAG crée donc un environnement virtuel applicatif
-`.airflow_venv` dans le projet et y installe le `requirements.txt` racine avant
-d'exécuter la collecte, dbt et le ML.
+Airflow est volontairement séparé des dépendances applicatives du projet. Le DAG
+ne lance pas les scripts Python directement dans le conteneur Airflow : il
+appelle le service Docker `job_market_pipeline`, qui possède déjà les
+dépendances applicatives et le `.env` du projet.
 
 ## Configuration locale
 

@@ -3,7 +3,6 @@ x-airflow-common: &airflow-common
     context: ./airflow
     dockerfile: Dockerfile
   env_file:
-    - .env
     - path: ./airflow/.env.example
       required: true
     - path: ./airflow/.env
@@ -14,17 +13,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
-    POSTGRES_HOST: postgres
-    PYTHONPATH: /opt/airflow/project
-    SELENIUM_HEADLESS: "true"
   volumes:
-    - ./:/opt/airflow/project
     - ./airflow/dags:/opt/airflow/dags
     - airflow_logs:/opt/airflow/logs
+    - /var/run/docker.sock:/var/run/docker.sock
   depends_on:
     airflow-postgres:
-      condition: service_healthy
-    postgres:
       condition: service_healthy
 
 services:
@@ -43,6 +37,28 @@ services:
       - ./src:/app/src:ro
       - ./models:/app/models:ro
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job_market_pipeline
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      SELENIUM_HEADLESS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./job_market_dbt:/app/job_market_dbt
+      - ./references:/app/references
+      - ./data:/app/data
+      - ./models:/app/models
+    command: tail -f /dev/null
 
   dashboard:
     build:

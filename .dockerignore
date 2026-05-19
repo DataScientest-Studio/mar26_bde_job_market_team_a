@@ -8,6 +8,5 @@ logs
 reports
 notebooks
 airflow
-.airflow_venv
 job_market_dbt/target
 job_market_dbt/logs

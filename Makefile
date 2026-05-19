@@ -78,7 +78,7 @@ dashboard-docker-logs:
 
 airflow:
 	@if not exist airflow\.env copy airflow\.env.example airflow\.env
-	docker compose up -d --build postgres airflow-postgres airflow-init airflow-webserver airflow-scheduler
+	docker compose up -d --build postgres pipeline airflow-postgres airflow-init airflow-webserver airflow-scheduler
 
 ml-train:
 	$(PYTHON) -m src.models.train_models --model-dir $(MODEL_DIR) --n-neighbors $(ML_NEIGHBORS)
@@ -88,10 +88,10 @@ ml-check:
 	$(MAKE) ml-train
 
 collect-france-travail:
-	$(PYTHON) $(COLLECTOR) --source france_travail
+	$(PYTHON) $(COLLECTOR) --source francetravail --update
 
 collect-welcome:
-	$(PYTHON) $(COLLECTOR) --source welcome
+	$(PYTHON) $(COLLECTOR) --source welcometothejungle --update
 
 postgres-up:
 	docker compose up -d postgres

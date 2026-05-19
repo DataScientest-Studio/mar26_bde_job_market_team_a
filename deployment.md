@@ -143,9 +143,10 @@ sudo ufw allow 5050/tcp
 
 Le pipeline est aussi planifié en quotidien (`@daily`).
 
-Au premier run, la tâche `install_project_dependencies` crée un environnement
-virtuel `.airflow_venv` dans le projet et y installe `requirements.txt`. Cela
-permet de garder Airflow séparé des dépendances applicatives comme SQLAlchemy 2.
+La tâche de setup `start_docker_services` démarre les conteneurs nécessaires,
+puis les tâches du DAG exécutent les commandes dans `job_market_pipeline` avec
+`docker exec`. Les dépendances et variables applicatives restent donc dans le
+service Docker du projet, pas dans Airflow.
 
 Pour suivre les logs :
 
@@ -180,17 +181,17 @@ Voir les logs Streamlit :
 docker compose logs -f dashboard
 ```
 
-Exécuter dbt manuellement dans le conteneur Airflow :
+Exécuter dbt manuellement dans le conteneur pipeline :
 
 ```bash
-docker compose exec airflow-scheduler bash -lc "cd /opt/airflow/project && .airflow_venv/bin/python scripts/run_dbt.py run"
-docker compose exec airflow-scheduler bash -lc "cd /opt/airflow/project && .airflow_venv/bin/python scripts/run_dbt.py test"
+docker compose exec pipeline python scripts/run_dbt.py run
+docker compose exec pipeline python scripts/run_dbt.py test
 ```
 
 Exécuter l'entraînement ML manuellement :
 
 ```bash
-docker compose exec airflow-scheduler bash -lc "cd /opt/airflow/project && .airflow_venv/bin/python -m src.models.train_models --model-dir models --n-neighbors 50"
+docker compose exec pipeline python -m src.models.train_models --model-dir models --n-neighbors 50
 ```
 
 ## Mise à jour du déploiement
