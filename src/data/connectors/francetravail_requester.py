@@ -1,13 +1,9 @@
 import requests
 import sys, os
-from pprint import pprint
 import json
 from datetime import datetime, timedelta, timezone
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 from pathlib import Path
-import urllib.parse
 
 load_dotenv(".env")
 
