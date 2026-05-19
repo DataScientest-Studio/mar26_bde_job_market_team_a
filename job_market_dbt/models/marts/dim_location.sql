@@ -1,6 +1,6 @@
 select
     location_id,
-    max({{ clean_city_label('coalesce(city_raw, city_norm)') }}) as city,
+    max(city_norm) as city,
     max(region_norm) as region,
     max(country_norm) as country,
     max(postal_code) as postal_code

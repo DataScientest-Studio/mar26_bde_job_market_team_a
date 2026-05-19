@@ -1,4 +1,4 @@
-/* offre canonique finale enrichie avec les cles de dimensions */
+-- Offre canonique finale enrichie avec les clés de dimensions
 select
     job_id,
     company_id,
@@ -8,10 +8,6 @@ select
     industry_id,
     salary_id,
     education_id,
-    title_raw,
-    title_norm,
-    description_raw,
-    description_norm,
     source_system as primary_source_system,
     source_offer_id as primary_source_offer_id,
     source_url as primary_source_url,

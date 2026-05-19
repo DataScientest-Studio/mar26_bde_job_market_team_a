@@ -6,7 +6,7 @@ from sqlmodel import Field, SQLModel
 
 class Company(SQLModel, table=True):
     __tablename__ = "dim_company"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     company_id: str = Field(primary_key=True)
     name: str | None = None
@@ -17,7 +17,7 @@ class Company(SQLModel, table=True):
 
 class Location(SQLModel, table=True):
     __tablename__ = "dim_location"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     location_id: str = Field(primary_key=True)
     city: str | None = None
@@ -28,7 +28,7 @@ class Location(SQLModel, table=True):
 
 class Contract(SQLModel, table=True):
     __tablename__ = "dim_contract"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     contract_type_id: str = Field(primary_key=True)
     contract_type: str | None = None
@@ -39,15 +39,24 @@ class Contract(SQLModel, table=True):
 
 class Industry(SQLModel, table=True):
     __tablename__ = "dim_industry"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     industry_id: str = Field(primary_key=True)
     industry_name: str | None = None
 
 
+class Education(SQLModel, table=True):
+    __tablename__ = "dim_education"
+    __table_args__ = {"schema": "analytics"}
+
+    education_id: str = Field(primary_key=True)
+    title: str | None = None
+    education_field: str | None = None
+
+
 class Salary(SQLModel, table=True):
     __tablename__ = "dim_salary"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     salary_id: str = Field(primary_key=True)
     frequency: str | None = None
@@ -58,7 +67,7 @@ class Salary(SQLModel, table=True):
 
 class JobType(SQLModel, table=True):
     __tablename__ = "dim_job_type"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     job_type_id: str = Field(primary_key=True)
     title: str | None = None
@@ -69,25 +78,42 @@ class JobType(SQLModel, table=True):
 
 class Skill(SQLModel, table=True):
     __tablename__ = "dim_skill"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     skill_id: str = Field(primary_key=True)
     skill_name: str
     skill_category: str
 
 
+class Advantage(SQLModel, table=True):
+    __tablename__ = "dim_advantage"
+    __table_args__ = {"schema": "analytics"}
+
+    advantage_id: str = Field(primary_key=True)
+    advantage_name: str
+
+
 class JobSkill(SQLModel, table=True):
     __tablename__ = "bridge_job_skill"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     job_skill_id: str = Field(primary_key=True)
     job_id: str
     skill_id: str
 
 
+class JobAdvantage(SQLModel, table=True):
+    __tablename__ = "bridge_job_advantage"
+    __table_args__ = {"schema": "analytics"}
+
+    job_advantage_id: str = Field(primary_key=True)
+    job_id: str
+    advantage_id: str
+
+
 class JobOffer(SQLModel, table=True):
     __tablename__ = "fact_job_offers"
-    __table_args__ = {"schema": "analytics", "extend_existing": True}
+    __table_args__ = {"schema": "analytics"}
 
     job_id: str = Field(primary_key=True)
     company_id: str | None = None
