@@ -20,9 +20,18 @@ options = Options()
 options.add_argument("--headless=new")
 options.add_argument("--disable-gpu")
 options.add_argument("--no-sandbox")
-driver = webdriver.Chrome(options=options)
+options.add_argument("--disable-extensions")
+options.add_argument("--disable-notifications")
+options.add_argument("--blink-settings=imagesEnabled=false")
+
+prefs = {
+    "profile.managed_default_content_settings.images": 2,
+}
+options.add_experimental_option("prefs", prefs)
 
 
+def create_driver():
+    return webdriver.Chrome(options=options)
 
 def export_to_json(result_dict):
     
@@ -48,45 +57,79 @@ def parse_yaml_scraping_classes():
         print("Failed to load yaml tags file.")
     return scraping_dict
 
-def initialize():
+def parse_iso_datetime(value):
+    if not value:
+        return None
+
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def is_already_scraped(published_at, latest_wttj):
+    published_dt = parse_iso_datetime(published_at)
+    latest_dt = parse_iso_datetime(latest_wttj)
+
+    if not published_dt or not latest_dt:
+        return False
+
+    return published_dt <= latest_dt
+
+def initialize(update_bool=False, latest_wttj=''):
+    driver = create_driver()
     try:
-        
         scraping_dict = parse_yaml_scraping_classes()
-        job_dicts_list=[]
-        search_pages_dict = scrape_searchpages(driver,scraping_dict['entry_page'])
-        
-        for region in list(search_pages_dict.keys()):
+        search_pages_dict = scrape_searchpages(driver, scraping_dict['entry_page'])
+
+        keys_list = list(search_pages_dict.keys())
+        seen_search_urls = set()
+        unique_jobs_dict = {}
+
+        for counter, region in enumerate(keys_list):
+            print(f"{region} : {counter+1} / {len(keys_list)}")
+
             for search_text in list(search_pages_dict[region].keys()):
-                jobs_dict={}
                 search_url = search_pages_dict[region][search_text]
-                jobs_dict[region] = scrape_search_page_to_dict(driver, search_url, scraping_dict['search_page'])
-                job_dicts_list.append(jobs_dict) # append a dict
+
+                if search_url in seen_search_urls:
+                    continue
+
+                seen_search_urls.add(search_url)
+
+                jobs_dict = scrape_search_page_to_dict(
+                    driver,
+                    search_url,
+                    scraping_dict['search_page']
+                )
+
+                for job_title, job_url in jobs_dict.items():
+                    if job_url not in unique_jobs_dict:
+                        unique_jobs_dict[job_url] = {
+                            "title": job_title,
+                            "region": region,
+                        }
 
         job_results_dict = {}
+        total_unique_jobs = len(unique_jobs_dict)
 
-        for jobs_dict in job_dicts_list:
-            for job_region, job_dict in jobs_dict.items():#TODO ranger la région en clé type région: job1:url1 là c'est pas le cas
-                for job_title, job_url in job_dict.items():
-                
-                    details = get_jobinfo(driver, job_url, scraping_dict["job_page"])
-                    details['region'] = job_region
-                    # Ajout de 'url en tant que clé de job (ID)
-                    job_results_dict[job_url] = details
-                
+        for counter, (job_url, job_meta) in enumerate(unique_jobs_dict.items(), start=1):
+            job_title = job_meta["title"]
+            job_region = job_meta["region"]
 
-        for job, details in job_results_dict.items():
-            print(f"\n{job}")
-            for key, value in details.items():
-                print(f"  {key}: {value}")
+            print(f"[Job details] {counter} / {total_unique_jobs} - {job_title}")
 
-        pprint.pprint(job_results_dict)
+            details = get_jobinfo(driver, job_url, scraping_dict["job_page"])
+
+            if update_bool and latest_wttj:
+                if is_already_scraped(details.get("published_at"), latest_wttj):
+                    continue
+
+            details["region"] = job_region
+            job_results_dict[job_url] = details
+
+        print(f"[WelcomeToTheJungle] Scraped {len(job_results_dict)} jobs.")
         return export_to_json(job_results_dict)
+
     finally:
         driver.quit()
-
-
-def main():
-    collect_welcome_to_the_jungle()
 
 
 if __name__ == "__main__":
