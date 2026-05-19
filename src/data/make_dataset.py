@@ -18,46 +18,59 @@ import src.data.connectors.francetravail_requester as ft
 
 def get_history():
     # On va chercher la valeur des dernières extractions dans le fichier history.yaml
-    try:
-        with open(HISTORY_PATH, 'r') as history:
-            history_dict = yaml.safe_load(history)
+    latest_ft_date = ""
+    latest_wttj_date = ""
 
-        latest_ft_date = history_dict['latest_builds']['francetravail']
-        latest_wttj_date = history_dict['latest_builds']['welcometothejungle']
-    except:
-        print("There was a problem loading the history yaml file.")
+    if not HISTORY_PATH:
+        raise ValueError("HISTORY_FILE_PATH is not defined in .env")
+
+    try:
+        with open(HISTORY_PATH, "r", encoding="utf-8") as history:
+            history_dict = yaml.safe_load(history) or {}
+
+        latest_builds = history_dict.get("latest_builds", {})
+
+        latest_ft_date = latest_builds.get("francetravail") or ""
+        latest_wttj_date = latest_builds.get("welcometothejungle") or ""
+
+    except Exception as e:
+        raise RuntimeError(f"There was a problem loading the history yaml file: {e}")
+
     return latest_ft_date, latest_wttj_date
 
 def make_history(source):
-    history_dict = {
-        "latest_builds": {
-            "francetravail":"",
-            "welcometothejungle":""
-        }
-    }
-    
-    now_utc = datetime.now(timezone(timedelta(hours=2))).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if not HISTORY_PATH:
+        raise ValueError("HISTORY_FILE_PATH is not defined in .env")
 
-    if source=="all":
-        history_dict["latest_builds"]["francetravail"]=now_utc
-        history_dict["latest_builds"]["welcometothejungle"]=now_utc
+    try:
+        with open(HISTORY_PATH, "r", encoding="utf-8") as history:
+            history_dict = yaml.safe_load(history) or {}
+    except FileNotFoundError:
+        history_dict = {}
 
+    history_dict.setdefault("latest_builds", {})
+    history_dict["latest_builds"].setdefault("francetravail", "")
+    history_dict["latest_builds"].setdefault("welcometothejungle", "")
+
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    if source == "all":
+        history_dict["latest_builds"]["francetravail"] = now_utc
+        history_dict["latest_builds"]["welcometothejungle"] = now_utc
     else:
-        history_dict["latest_builds"][source]=now_utc
+        history_dict["latest_builds"][source] = now_utc
 
-    with open(HISTORY_PATH, 'w') as history:
+    with open(HISTORY_PATH, "w", encoding="utf-8") as history:
         yaml.safe_dump(history_dict, history)
-        
+
 
 def run_france_travail(update_bool=False, latest_ft='') -> None:
-    
     ft.initialize(update_bool, latest_ft)
     print(f"[France Travail] Completed requests successfully.")
 
 
-def run_welcome() -> None:
-    
-    wttj.initialize()
+def run_welcome(update_bool=False, latest_wttj='') -> None:
+    wttj.initialize(update_bool, latest_wttj)
     print(f"[WelcomeToTheJungle] Completed scraping successfully.")
 
 
@@ -77,22 +90,24 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    
+
     if args.update:
         latest_ft, latest_wttj = get_history()
         update_bool = True
+
     else:
         update_bool = False
         latest_ft=""
+
     if args.source == "francetravail":
         run_france_travail(update_bool, latest_ft)
     
     if args.source == "welcometothejungle":
-        run_welcome()
+        run_welcome(update_bool, latest_wttj)
 
     if args.source == "all":
         run_france_travail(update_bool, latest_ft)
-        run_welcome()
+        run_welcome(update_bool, latest_wttj)
 
     make_history(args.source)
 

@@ -2,7 +2,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-import pprint
 
 
 def scrape_searchpages(driver, scraping_classes):
@@ -38,5 +37,5 @@ def scrape_searchpages(driver, scraping_classes):
                 search_text=span.text
                 # Construction du dict à partir des différentes valeurs trouvées sur la page
                 jobsearches_per_regionblock_dict[region_name][search_text] = WELCOME_URL_BASE+search_link
-    pprint.pprint(jobsearches_per_regionblock_dict)
+
     return jobsearches_per_regionblock_dict

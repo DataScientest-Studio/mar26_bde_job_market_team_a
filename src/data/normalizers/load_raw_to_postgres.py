@@ -320,7 +320,9 @@ def parse_args() -> argparse.Namespace:
         "--source",
         choices=[
             "all",
+            "francetravail",
             "france_travail",
+            "welcometothejungle",
             "welcome_to_the_jungle",
         ],
         default="all",
@@ -366,7 +368,7 @@ def main() -> None:
 
         ensure_landing_schema(conn)
 
-        if args.source in {"all", "france_travail"}:
+        if args.source in {"all", "francetravail", "france_travail"}:
             inserted, skipped, files = load_france_travail(
                 conn,
                 target_date=target_date,
@@ -375,7 +377,7 @@ def main() -> None:
             total_skipped += skipped
             loaded_files.extend(files)
 
-        if args.source in {"all", "welcome_to_the_jungle"}:
+        if args.source in {"all", "welcometothejungle", "welcome_to_the_jungle"}:
             inserted, skipped, files = load_welcome_to_the_jungle(
                 conn,
                 target_date=target_date,
