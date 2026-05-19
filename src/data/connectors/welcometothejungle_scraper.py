@@ -5,13 +5,16 @@ import yaml
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
-from scrapesearchpage import scrape_search_page_to_dict
-from scrapejob import get_jobinfo
-from scrape_entrypage import scrape_searchpages
+from src.data.connectors.scrapesearchpage import scrape_search_page_to_dict
+from src.data.connectors.scrapejob import get_jobinfo
+from src.data.connectors.scrape_entrypage import scrape_searchpages
 import yaml, json, pprint, os
 from pathlib import Path
+from dotenv import load_dotenv
 
-YAML_TAGS = "references/data_extraction/welcome_to_the_jungle/webscraping_metadata.yml"
+load_dotenv(".env")
+
+SCRAPING_TAGS_YAML = os.getenv("SCRAPING_TAGS")
 
 options = Options()
 options.add_argument("--headless=new")
@@ -37,28 +40,21 @@ def export_to_json(result_dict):
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_dict, file, indent=4, ensure_ascii=False)
 
-    return json_path
-
-
 def parse_yaml_scraping_classes():
-    with open(YAML_TAGS, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    try:
+        with open(SCRAPING_TAGS_YAML, "r") as f:
+            scraping_dict=yaml.safe_load(f)
+    except:
+        print("Failed to load yaml tags file.")
+    return scraping_dict
 
-
-def collect_welcome_to_the_jungle():
-    options = Options()
-    options.add_argument("--headless=new")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    driver = webdriver.Chrome(options=options)
-
+def initialize():
     try:
         
         scraping_dict = parse_yaml_scraping_classes()
         job_dicts_list=[]
         search_pages_dict = scrape_searchpages(driver,scraping_dict['entry_page'])
         
-        #TODO supprimer la collection targets vu qu'on n'a plus le choix des recherches à cause de welcome to the jungle
         for region in list(search_pages_dict.keys()):
             for search_text in list(search_pages_dict[region].keys()):
                 jobs_dict={}
@@ -94,4 +90,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    initialize()
