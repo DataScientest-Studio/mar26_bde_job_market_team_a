@@ -133,35 +133,45 @@ upper({{ normalize_match_text(expression) }})
 
 -- Harmonise les types de contrat avant publication et création des ids
 {% macro clean_contract_type_label(expression) -%}
-{% set cleaned_expression %}
-regexp_replace(
-    replace(
-        replace(
-            replace(
-                replace(
-                    replace(
-                        replace(coalesce({{ expression }}, ''), 'freelances', 'freelance'),
-                        'alternances',
-                        'alternance'
-                    ),
-                    'apprentissages',
-                    'apprentissage'
-                ),
-                'interims',
-                'interim'
-            ),
-            'stages',
-            'stage'
-        ),
-        'cdds',
-        'cdd'
-    ),
-    '\bcdis\b',
-    'cdi',
-    'g'
-)
-{% endset %}
-{{ clean_analytics_label(cleaned_expression) }}
+{% set normalized_expression = normalize_match_text(expression) %}
+{% set tokenized_expression = "' ' || " ~ normalized_expression ~ " || ' '" %}
+case
+    when {{ normalized_expression }} is null then null
+    when {{ tokenized_expression }} like '% alternance %'
+        or {{ tokenized_expression }} like '% alternant %'
+        or {{ tokenized_expression }} like '% apprentissage %'
+        or {{ tokenized_expression }} like '% apprenti %'
+        or {{ tokenized_expression }} like '% professionnalisation %'
+        then 'ALTERNANCE'
+    when {{ tokenized_expression }} like '% stage %'
+        or {{ tokenized_expression }} like '% stagiaire %'
+        then 'STAGE'
+    when {{ tokenized_expression }} like '% interim %'
+        or {{ tokenized_expression }} like '% interimaire %'
+        or {{ tokenized_expression }} like '% mis %'
+        then 'INTERIM'
+    when {{ tokenized_expression }} like '% saisonnier %'
+        or {{ tokenized_expression }} like '% sai %'
+        then 'SAISONNIER'
+    when {{ tokenized_expression }} like '% cdi %'
+        then 'CDI'
+    when {{ tokenized_expression }} like '% cdd %'
+        or {{ normalized_expression }} like '%temporaire%'
+        then 'CDD'
+    when {{ tokenized_expression }} like '% freelance %'
+        or {{ tokenized_expression }} like '% independant %'
+        or {{ tokenized_expression }} like '% liberal %'
+        or {{ tokenized_expression }} like '% lib %'
+        or {{ tokenized_expression }} like '% cce %'
+        then 'FREELANCE'
+    when {{ tokenized_expression }} like '% franchise %'
+        or {{ tokenized_expression }} like '% fra %'
+        then 'FRANCHISE'
+    when {{ tokenized_expression }} like '% benevole %'
+        or {{ tokenized_expression }} like '% benevolat %'
+        then 'BENEVOLE'
+    else 'AUTRE'
+end
 {%- endmacro %}
 
 -- Retire les préfixes code postal/département souvent présents dans les villes FT

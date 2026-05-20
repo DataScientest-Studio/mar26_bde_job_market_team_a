@@ -22,7 +22,16 @@ renamed as (
         {{ clean_city_label("raw_payload #>> '{lieuTravail,libelle}'") }} as city_raw,
         raw_payload #>> '{lieuTravail,codePostal}' as postal_code_raw,
         raw_payload #>> '{lieuTravail,commune}' as commune_code_raw,
-        raw_payload ->> 'typeContratLibelle' as contract_type_raw,
+        concat_ws(
+            ' ',
+            nullif(raw_payload ->> 'typeContrat', ''),
+            nullif(raw_payload ->> 'typeContratLibelle', ''),
+            nullif(raw_payload ->> 'natureContrat', ''),
+            case
+                when coalesce((raw_payload ->> 'alternance')::boolean, false)
+                    then 'alternance'
+            end
+        ) as contract_type_raw,
         coalesce(
             nullif(raw_payload #>> '{salaire,libelle}', ''),
             nullif(raw_payload #>> '{salaire,commentaire}', '')
