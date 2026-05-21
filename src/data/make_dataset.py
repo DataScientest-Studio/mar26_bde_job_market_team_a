@@ -69,8 +69,8 @@ def run_france_travail(update_bool=False, latest_ft='') -> None:
     print(f"[France Travail] Completed requests successfully.")
 
 
-def run_welcome(update_bool=False, latest_wttj='') -> None:
-    wttj.initialize(update_bool, latest_wttj)
+def run_welcome() -> None:
+    wttj.initialize()
     print(f"[WelcomeToTheJungle] Completed scraping successfully.")
 
 
@@ -103,11 +103,11 @@ def main() -> None:
         run_france_travail(update_bool, latest_ft)
     
     if args.source == "welcometothejungle":
-        run_welcome(update_bool, latest_wttj)
+        run_welcome()
 
     if args.source == "all":
         run_france_travail(update_bool, latest_ft)
-        run_welcome(update_bool, latest_wttj)
+        run_welcome()
 
     make_history(args.source)
 
