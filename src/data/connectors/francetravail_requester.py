@@ -95,12 +95,13 @@ def get_publiee_depuis_arg_nb(latest_ft):
     # Formattage du delta entre now et la dernière requete en une valeur absolue
     days_result_nb = abs((datetime.strptime(now_utc,format) - datetime.strptime(latest_ft,format)).days)
     # Max value = 7
-    if days_result_nb > 7:
+    if days_result_nb >= 7:
         days_result_nb = 7
 
     return days_result_nb
 
 def gather_data_from_api(target_regions_lst, access_token, update_bool=False, latest_ft=''):
+    exported_files = 0
 
     # Parcours des régions
     for target_region in target_regions_lst:
@@ -138,16 +139,20 @@ def gather_data_from_api(target_regions_lst, access_token, update_bool=False, la
 
             # Regroupement des jobs dans une liste de pages
             data_regionpages_lst.append(data)
-        export_to_json(data_regionpages_lst, region_code)
+        if data_regionpages_lst:
+            export_to_json(data_regionpages_lst, region_code)
+            exported_files += 1
+
+    return exported_files
 
 
 def initialize(update_bool=False, latest_ft='' ):
     # access token
     access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
-    print(f"Access Token: {access_token}")
+    print("[France Travail] Access token retrieved.")
 
     target_regions_lst = parse_region_codes()
-    gather_data_from_api(target_regions_lst, access_token, update_bool, latest_ft)
+    return gather_data_from_api(target_regions_lst, access_token, update_bool, latest_ft)
 
 if __name__ == "__main__":
     initialize()

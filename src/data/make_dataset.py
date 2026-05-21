@@ -64,14 +64,16 @@ def make_history(source):
         yaml.safe_dump(history_dict, history)
 
 
-def run_france_travail(update_bool=False, latest_ft='') -> None:
-    ft.initialize(update_bool, latest_ft)
+def run_france_travail(update_bool=False, latest_ft='') -> bool:
+    exported_files = ft.initialize(update_bool, latest_ft)
     print(f"[France Travail] Completed requests successfully.")
+    return exported_files > 0
 
 
-def run_welcome() -> None:
+def run_welcome() -> bool:
     wttj.initialize()
     print(f"[WelcomeToTheJungle] Completed scraping successfully.")
+    return True
 
 
 def parse_args() -> argparse.Namespace:
@@ -99,17 +101,24 @@ def main() -> None:
         update_bool = False
         latest_ft=""
 
+    history_sources = []
+
     if args.source == "francetravail":
-        run_france_travail(update_bool, latest_ft)
+        if run_france_travail(update_bool, latest_ft):
+            history_sources.append("francetravail")
     
     if args.source == "welcometothejungle":
-        run_welcome()
+        if run_welcome():
+            history_sources.append("welcometothejungle")
 
     if args.source == "all":
-        run_france_travail(update_bool, latest_ft)
-        run_welcome()
+        if run_france_travail(update_bool, latest_ft):
+            history_sources.append("francetravail")
+        if run_welcome():
+            history_sources.append("welcometothejungle")
 
-    make_history(args.source)
+    for source in history_sources:
+        make_history(source)
 
 if __name__ == "__main__":
     main()

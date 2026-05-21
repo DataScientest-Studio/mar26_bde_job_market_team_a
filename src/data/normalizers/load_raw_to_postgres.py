@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -21,8 +22,8 @@ from src.database import get_dbt_target, get_engine, load_project_env
 load_project_env()
 
 
-RAW_DATA_DIR = Path("data/raw")
-PROCESSED_DATA_DIR = Path("data/processed")
+RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
+PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
 FRANCE_TRAVAIL_URL = "https://candidat.francetravail.fr/offres/recherche/detail/{offer_id}"
 FRANCE_TRAVAIL_SOURCE_DIR = "france_travail"
 WELCOME_TO_THE_JUNGLE_SOURCE_DIR = "welcome_to_the_jungle"
@@ -47,7 +48,8 @@ def parse_load_date(value: str) -> date:
 
 
 def file_name_ends_with_date(file_path: Path, target_date: date) -> bool:
-    return file_path.stem.endswith(f"_{target_date:{RAW_FILE_DATE_FORMAT}}")
+    target = f"{target_date:{RAW_FILE_DATE_FORMAT}}"
+    return re.search(rf"(?:^|_){re.escape(target)}(?:_|$)", file_path.stem) is not None
 
 
 def iter_json_files(
@@ -209,13 +211,19 @@ def processed_destination(file_path: Path) -> Path:
 
 def move_processed_files(files: list[Path]) -> None:
     for file_path in files:
-        if len(file_path.parts) < 3 or file_path.parts[0] != "data" or file_path.parts[1] != "raw":
+        try:
+            file_path.relative_to(RAW_DATA_DIR)
+        except ValueError:
             continue
 
         destination = processed_destination(file_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         file_path.replace(destination)
-        print(f"[processed] {file_path.as_posix()} -> {destination.as_posix()}")
+        print(
+            "[processed] "
+            f"{file_path.relative_to(PROJECT_ROOT).as_posix()} -> "
+            f"{destination.relative_to(PROJECT_ROOT).as_posix()}"
+        )
 
 
 def iter_welcome_to_the_jungle_files(
