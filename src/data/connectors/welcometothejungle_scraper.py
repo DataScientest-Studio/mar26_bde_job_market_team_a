@@ -57,23 +57,7 @@ def parse_yaml_scraping_classes():
         print("Failed to load yaml tags file.")
     return scraping_dict
 
-def parse_iso_datetime(value):
-    if not value:
-        return None
-
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
-def is_already_scraped(published_at, latest_wttj):
-    published_dt = parse_iso_datetime(published_at)
-    latest_dt = parse_iso_datetime(latest_wttj)
-
-    if not published_dt or not latest_dt:
-        return False
-
-    return published_dt <= latest_dt
-
-def initialize(update_bool=False, latest_wttj=''):
+def initialize():
     driver = create_driver()
     try:
         scraping_dict = parse_yaml_scraping_classes()
@@ -117,11 +101,6 @@ def initialize(update_bool=False, latest_wttj=''):
             print(f"[Job details] {counter} / {total_unique_jobs} - {job_title}")
 
             details = get_jobinfo(driver, job_url, scraping_dict["job_page"])
-
-            if update_bool and latest_wttj:
-                if is_already_scraped(details.get("published_at"), latest_wttj):
-                    continue
-
             details["region"] = job_region
             job_results_dict[job_url] = details
 
