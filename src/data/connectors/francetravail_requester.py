@@ -16,6 +16,8 @@ SCOPES = os.getenv("FRANCE_TRAVAIL_SCOPE")
 REGION_CODES_PATH = "references/data_extraction/france_travail/region_codes.json"
 API_URL = f"{API_BASE_URL}/offres/search"
 
+request_datetime = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+
 def get_access_token(client_id, client_secret, token_url):
     # OAuth token access
     try:    
@@ -81,9 +83,7 @@ def export_to_json(result_lst, region=''):
     data_dump_folder = project_root.joinpath("data/raw/france_travail")
     data_dump_folder.mkdir(parents=True, exist_ok=True)
 
-    collection_date = datetime.now().strftime("%Y-%m-%d")
-    json_path = data_dump_folder / f"france_travail_{region}_{collection_date}.json"
-
+    json_path = data_dump_folder / f"france_travail_{region}_{request_datetime}.json"
     with open(json_path, "w", encoding="utf-8") as file:
         json.dump(result_lst, file, indent=4, ensure_ascii=False)
 
