@@ -57,22 +57,6 @@ def parse_yaml_scraping_classes():
         print("Failed to load yaml tags file.")
     return scraping_dict
 
-def parse_iso_datetime(value):
-    if not value:
-        return None
-
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
-def is_already_scraped(published_at, latest_wttj):
-    published_dt = parse_iso_datetime(published_at)
-    latest_dt = parse_iso_datetime(latest_wttj)
-
-    if not published_dt or not latest_dt:
-        return False
-
-    return published_dt <= latest_dt
-
 def initialize():
     driver = create_driver()
     try:
