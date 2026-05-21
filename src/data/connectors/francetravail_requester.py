@@ -73,7 +73,7 @@ def parse_region_codes():
         regioncodes_lst = json.load(file)
     return regioncodes_lst
 
-def export_to_json(result_lst, region='', update_bool=False):
+def export_to_json(result_lst, region=''):
     
     connectors_dir = Path(__file__).parent
     src_data_dir = connectors_dir.parent
@@ -138,7 +138,7 @@ def gather_data_from_api(target_regions_lst, access_token, update_bool=False, la
 
             # Regroupement des jobs dans une liste de pages
             data_regionpages_lst.append(data)
-        export_to_json(data_regionpages_lst, region_code, update_bool)
+        export_to_json(data_regionpages_lst, region_code)
 
 
 def initialize(update_bool=False, latest_ft='' ):
