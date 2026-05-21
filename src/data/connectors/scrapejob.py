@@ -114,19 +114,27 @@ def scrape_publication_datetime(soup, scraping_classes, result_dict,):
         result_dict['published_at'] = publication_datetime
     return result_dict
 
+def accept_cookies_once(driver):
+    if getattr(accept_cookies_once, "done", False):
+        return
+
+    try:
+        cookie_button = WebDriverWait(driver, 1).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'OK pour moi')]"))
+        )
+        cookie_button.click()
+        time.sleep(0.2)
+    except:
+        pass
+    finally:
+        accept_cookies_once.done = True
+
 def get_jobinfo(driver,url, scraping_classes):
 
     driver.get(url)
 
     # Accept cookies if present
-    try:
-        cookie_button = WebDriverWait(driver, 3).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'OK pour moi')]"))
-        )
-        cookie_button.click()
-        time.sleep(1)
-    except:
-        pass
+    accept_cookies_once(driver)
 
     WebDriverWait(driver, 10).until(
         EC.presence_of_all_elements_located((By.TAG_NAME, "h2"))
