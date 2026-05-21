@@ -16,6 +16,33 @@ with primary_matches as (
         normalized_offer_id
     from {{ ref('int_job_offer_matches') }}
     where is_primary_source
+),
+
+salary_candidates as (
+    select
+        job_id,
+        salary_raw
+    from (
+        select
+            source_match.job_id,
+            fallback_normalized.salary_raw,
+            row_number() over (
+                partition by source_match.job_id
+                order by
+                    case
+                        when source_match.is_primary_source then 1
+                        when fallback_normalized.source_system = 'welcome_to_the_jungle' then 2
+                        else 3
+                    end,
+                    fallback_normalized.published_at_norm desc nulls last
+            ) as salary_rank
+        from {{ ref('int_job_offer_matches') }} as source_match
+        inner join {{ ref('int_job_offers_normalized') }} as fallback_normalized
+            on source_match.normalized_offer_id = fallback_normalized.normalized_offer_id
+        where nullif(fallback_normalized.salary_raw, '') is not null
+            and lower(fallback_normalized.salary_raw) not like '%non sp%'
+    ) as ranked_salary_candidates
+    where salary_rank = 1
 )
 
 select
@@ -40,7 +67,12 @@ select
     normalized.contract_type_raw,
     normalized.contract_type_norm,
     normalized.remote_norm,
-    normalized.salary_raw,
+    case
+        when nullif(normalized.salary_raw, '') is not null
+            and lower(normalized.salary_raw) not like '%non sp%'
+            then normalized.salary_raw
+        else salary_candidates.salary_raw
+    end as salary_raw,
     normalized.published_at_norm,
     normalized.updated_at,
     normalized.working_time_raw,
@@ -78,6 +110,8 @@ select
 from primary_matches as matches
 inner join {{ ref('int_job_offers_normalized') }} as normalized
     on matches.normalized_offer_id = normalized.normalized_offer_id
+left join salary_candidates
+    on matches.job_id = salary_candidates.job_id
 left join lateral (
     select string_agg(trim(schedule_value.value), ' | ') as schedule_context_raw
     from jsonb_array_elements_text(

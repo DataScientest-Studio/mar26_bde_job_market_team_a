@@ -3,7 +3,7 @@
 
 -- Texte salaire standardisé pour les regex
 {% macro salary_text(salary_expression) -%}
-lower(coalesce({{ salary_expression }}, ''))
+lower(replace(coalesce({{ salary_expression }}, ''), '€', ' eur'))
 {%- endmacro %}
 
 -- Détecte les salaires en milliers : 44K, 44 k EUR, etc
