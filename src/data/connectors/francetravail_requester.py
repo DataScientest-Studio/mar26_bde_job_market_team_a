@@ -14,6 +14,7 @@ API_BASE_URL = os.getenv("FRANCE_TRAVAIL_BASE_URL")
 SCOPES = os.getenv("FRANCE_TRAVAIL_SCOPE")
 
 REGION_CODES_PATH = "references/data_extraction/france_travail/region_codes.json"
+DEPARTEMENT_CODES_PATH = "references/data_extraction/france_travail/departements_codes.json"
 API_URL = f"{API_BASE_URL}/offres/search"
 
 request_datetime = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -67,11 +68,11 @@ def call_protected_api(api_url, token):
     except requests.exceptions.RequestException as e:
         return None
 
-# Parsing du fichier de référence region_codes.json
-def parse_region_codes():
-    with open(REGION_CODES_PATH, 'r') as file:
-        regioncodes_lst = json.load(file)
-    return regioncodes_lst
+# Parsing de fichiers de référence
+def parse_json(path):
+    with open(path, 'r') as file:
+        content = json.load(file)
+    return content
 
 def export_to_json(result_lst, region=''):
     
@@ -94,56 +95,72 @@ def get_publiee_depuis_arg_nb(latest_ft):
     
     # Formattage du delta entre now et la dernière requete en une valeur absolue
     days_result_nb = abs((datetime.strptime(now_utc,format) - datetime.strptime(latest_ft,format)).days)
-    # Max value = 7
-    if days_result_nb >= 7:
-        days_result_nb = 7
+
+    day_milestones_lst = [1,3,7,14,31]
+
+    if days_result_nb not in day_milestones_lst:
+        if days_result_nb == 0:
+            days_result_nb = 1
+        elif days_result_nb > day_milestones_lst[-1]:
+            days_result_nb = day_milestones_lst[-1]
+
+        else:
+            for day_milestone in day_milestones_lst:
+                if days_result_nb < day_milestone:
+                    days_result_nb = day_milestones_lst[day_milestones_lst.index(day_milestone)-1]
+                    break
+                else:
+                    continue
 
     return days_result_nb
 
-def gather_data_from_api(target_regions_lst, access_token, update_bool=False, latest_ft=''):
-    exported_files = 0
+def gather_data_from_api(target_regions_lst, target_departements_lst, access_token, update_bool=False, latest_ft=''):
 
     # Parcours des régions
     for target_region in target_regions_lst:
+
         region_code = target_region['code']
         region_name = target_region['libelle']
         data_regionpages_lst = []
 
-        for page in range(21):
+        for target_departement in target_departements_lst:
 
-            # parcours des pages par plages d'index (max index 3149)
-            first_index = page*150
-            last_index = first_index+150-1
-            search_range = f"{first_index}-{last_index}"
+            departement_code = target_departement['code']
+            departement_name = target_departement['libelle']
 
-            # API endpoint construction
-            search_url = API_URL+f"?region={region_code}&range={search_range}"
-            
-            # Ajout de l'argument publieeDepuis en cas d'update (depuis 7j max)
-            if update_bool==True:
-                nb_days = get_publiee_depuis_arg_nb(latest_ft)
-                publiee_depuis_arg = f"&publieeDepuis={nb_days}"
-                search_url = search_url+publiee_depuis_arg
+            if target_departement['region']['code'] == region_code:
 
-            # Lancement de la requête
-            data = call_protected_api(search_url, access_token)
+                for page in range(21):
 
-            # Check de la reponse et du contenu renvoyé par l'API
-            if data == None:
-                print(f"{region_name} (code {region_code}): No data found starting index {first_index}.")
-                break
+                    # parcours des pages par plages d'index (max index 3149)
+                    first_index = page*150
+                    last_index = first_index+150-1
+                    search_range = f"{first_index}-{last_index}"
 
-            # Appending of the region data to the dictionary for referencing
-            data['region']=region_name
-            data['region_code']=region_code
+                    # API endpoint construction
+                    search_url = API_URL+f"?departement={departement_code}&range={search_range}"
+                    
+                    # Ajout de l'argument publieeDepuis en cas d'update (depuis 7j max)
+                    if update_bool==True:
+                        nb_days = get_publiee_depuis_arg_nb(latest_ft)
+                        publiee_depuis_arg = f"&publieeDepuis={nb_days}"
+                        search_url = search_url+publiee_depuis_arg
+                        print(f"Publiées depuis {publiee_depuis_arg}")
+                    # Lancement de la requête
+                    data = call_protected_api(search_url, access_token)
 
-            # Regroupement des jobs dans une liste de pages
-            data_regionpages_lst.append(data)
-        if data_regionpages_lst:
-            export_to_json(data_regionpages_lst, region_code)
-            exported_files += 1
+                    # Check de la reponse et du contenu renvoyé par l'API
+                    if data is None:
+                        print(f"{region_code}:{region_name} - {departement_name} : No data found after {first_index}.")
+                        break
 
-    return exported_files
+                    # Appending of the region data to the dictionary for referencing
+                    data['region']=region_name
+                    data['region_code']=region_code
+
+                    # Regroupement des jobs dans une liste de pages
+                    data_regionpages_lst.append(data)
+                export_to_json(data_regionpages_lst, region_code)
 
 
 def initialize(update_bool=False, latest_ft='' ):
@@ -151,8 +168,9 @@ def initialize(update_bool=False, latest_ft='' ):
     access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
     print("[France Travail] Access token retrieved.")
 
-    target_regions_lst = parse_region_codes()
-    return gather_data_from_api(target_regions_lst, access_token, update_bool, latest_ft)
+    target_regions_lst = parse_json(REGION_CODES_PATH)
+    target_departements_lst = parse_json(DEPARTEMENT_CODES_PATH)
+    gather_data_from_api(target_regions_lst, target_departements_lst, access_token, update_bool, latest_ft)
 
 if __name__ == "__main__":
     initialize()
