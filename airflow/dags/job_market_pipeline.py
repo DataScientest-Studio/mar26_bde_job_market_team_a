@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+from airflow.operators.python import ShortCircuitOperator
 from airflow.utils.trigger_rule import TriggerRule
 
 
@@ -20,6 +21,22 @@ DEFAULT_ARGS = {
 
 def pipeline_command(command: str) -> str:
     return f"docker exec {PIPELINE_CONTAINER} {command}"
+
+
+def has_loaded_rows(**context) -> bool:
+    task_instance = context["ti"]
+    load_task_ids = [
+        "load_raw_france_travail",
+        "load_raw_welcome_to_the_jungle",
+    ]
+    inserted_rows = [
+        int(task_instance.xcom_pull(task_ids=task_id) or 0)
+        for task_id in load_task_ids
+    ]
+    total_inserted = sum(inserted_rows)
+    print(f"Inserted rows by source: {dict(zip(load_task_ids, inserted_rows))}")
+    print(f"Total inserted rows before dbt: {total_inserted}")
+    return total_inserted > 0
 
 
 with DAG(
@@ -50,14 +67,25 @@ with DAG(
 
     load_raw_france_travail = BashOperator(
         task_id="load_raw_france_travail",
-        bash_command=pipeline_command("python src/data/normalizers/load_raw_to_postgres.py --source francetravail"),
+        bash_command=pipeline_command(
+            "python src/data/normalizers/load_raw_to_postgres.py --source francetravail --xcom-inserted-rows"
+        ),
+        do_xcom_push=True,
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
     load_raw_welcome_to_the_jungle = BashOperator(
         task_id="load_raw_welcome_to_the_jungle",
-        bash_command=pipeline_command("python src/data/normalizers/load_raw_to_postgres.py --source welcometothejungle"),
+        bash_command=pipeline_command(
+            "python src/data/normalizers/load_raw_to_postgres.py --source welcometothejungle --xcom-inserted-rows"
+        ),
+        do_xcom_push=True,
         trigger_rule=TriggerRule.ALL_DONE,
+    )
+
+    should_run_dbt = ShortCircuitOperator(
+        task_id="should_run_dbt",
+        python_callable=has_loaded_rows,
     )
 
     dbt_run = BashOperator(
@@ -74,12 +102,12 @@ with DAG(
     train_ml_models = BashOperator(
         task_id="train_ml_models",
         bash_command=pipeline_command(
-            "python -m src.models.train_models --model-dir models --n-neighbors ${ML_NEIGHBORS:-50}"
+            "python -m src.models.train_models --model-dir models"
         ),
     )
 
     start_docker_services >> [collect_france_travail, collect_welcome_to_the_jungle]
     collect_france_travail >> load_raw_france_travail
     collect_welcome_to_the_jungle >> load_raw_welcome_to_the_jungle
-    [load_raw_france_travail, load_raw_welcome_to_the_jungle] >> dbt_run
+    [load_raw_france_travail, load_raw_welcome_to_the_jungle] >> should_run_dbt >> dbt_run
     dbt_run >> dbt_test >> train_ml_models

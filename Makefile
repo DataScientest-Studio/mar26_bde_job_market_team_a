@@ -91,7 +91,7 @@ collect-france-travail:
 	$(PYTHON) $(COLLECTOR) --source francetravail --update
 
 collect-welcome:
-	$(PYTHON) $(COLLECTOR) --source welcometothejungle --update
+	$(PYTHON) $(COLLECTOR) --source welcometothejungle
 
 postgres-up:
 	docker compose up -d postgres

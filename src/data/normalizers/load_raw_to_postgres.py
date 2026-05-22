@@ -352,6 +352,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Drop landing raw tables before loading files.",
     )
+    parser.add_argument(
+        "--xcom-inserted-rows",
+        action="store_true",
+        help="Print the inserted row count as the last output line for Airflow XCom.",
+    )
     return parser.parse_args()
 
 
@@ -397,6 +402,9 @@ def main() -> None:
     print(f"Total inserted rows: {total_inserted}")
     print(f"Total skipped duplicate rows: {total_skipped}")
     move_processed_files(loaded_files)
+
+    if args.xcom_inserted_rows:
+        print(total_inserted)
 
 
 if __name__ == "__main__":
