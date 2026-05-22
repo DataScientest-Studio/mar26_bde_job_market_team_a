@@ -94,3 +94,5 @@ target/
 
 # csv 
 *.csv
+# ignore history file
+/references/data_extraction/history.yml
