@@ -6,3 +6,4 @@ select distinct
     salary_currency as currency
 from {{ ref('int_primary_job_offers') }}
 where salary_id is not null
+    and salary_frequency_norm is not null

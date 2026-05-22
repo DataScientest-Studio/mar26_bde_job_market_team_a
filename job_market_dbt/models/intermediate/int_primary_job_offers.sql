@@ -100,9 +100,12 @@ final as (
     select
         *,
         (
-            salary_min_guarded is not null
-            or salary_max_guarded is not null
-        ) as has_guarded_salary
+            salary_frequency_norm is not null
+            and (
+                salary_min_guarded is not null
+                or salary_max_guarded is not null
+            )
+        ) as has_valid_salary
     from salary_guarded
 )
 
@@ -131,11 +134,11 @@ select
     weekly_hours,
     full_time,
     salary_raw,
-    salary_min_guarded as salary_min_norm,
-    salary_max_guarded as salary_max_norm,
-    case when has_guarded_salary then salary_frequency_norm else null end as salary_frequency_norm,
-    case when has_guarded_salary then salary_month_count else null end as salary_month_count,
-    case when has_guarded_salary then salary_currency else null end as salary_currency,
+    case when has_valid_salary then salary_min_guarded else null end as salary_min_norm,
+    case when has_valid_salary then salary_max_guarded else null end as salary_max_norm,
+    case when has_valid_salary then salary_frequency_norm else null end as salary_frequency_norm,
+    case when has_valid_salary then salary_month_count else null end as salary_month_count,
+    case when has_valid_salary then salary_currency else null end as salary_currency,
     published_at_norm as published_at,
     updated_at,
     experience_raw,
@@ -163,12 +166,12 @@ select
     job_type_id,
     industry_id,
     {{ salary_dimension_id(
-        'salary_min_guarded',
-        'salary_max_guarded',
-        'case when has_guarded_salary then salary_frequency_norm else null end',
-        'case when has_guarded_salary then salary_month_count else null end',
+        'case when has_valid_salary then salary_min_guarded else null end',
+        'case when has_valid_salary then salary_max_guarded else null end',
+        'case when has_valid_salary then salary_frequency_norm else null end',
+        'case when has_valid_salary then salary_month_count else null end',
         'weekly_hours',
-        'case when has_guarded_salary then salary_currency else null end'
+        'case when has_valid_salary then salary_currency else null end'
     ) }} as salary_id,
     created_at
 from final
