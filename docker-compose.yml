@@ -1,3 +1,26 @@
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile
+  env_file:
+    - path: ./airflow/.env.example
+      required: true
+    - path: ./airflow/.env
+      required: false
+  user: "0:0"
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - airflow_logs:/opt/airflow/logs
+    - /var/run/docker.sock:/var/run/docker.sock
+  depends_on:
+    airflow-postgres:
+      condition: service_healthy
+
 services:
   api:
     build:
@@ -12,7 +35,30 @@ services:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./src:/app/src:ro
+      - ./models:/app/models:ro
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job_market_pipeline
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      SELENIUM_HEADLESS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./job_market_dbt:/app/job_market_dbt
+      - ./references:/app/references
+      - ./data:/app/data
+      - ./models:/app/models
+    command: tail -f /dev/null
 
   dashboard:
     build:
@@ -59,7 +105,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@jobmarket.local}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-marbdejobmarketa@gmail.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
       PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
     ports:
@@ -67,6 +113,59 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
 
+  airflow-postgres:
+    image: postgres:16
+    container_name: job_market_airflow_postgres
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: job_market_airflow_init
+    command: >
+      bash -c "
+      airflow db migrate &&
+      (
+      airflow users create
+      --username $${AIRFLOW_ADMIN_USERNAME:-admin}
+      --password $${AIRFLOW_ADMIN_PASSWORD:-admin}
+      --firstname Job
+      --lastname Market
+      --role Admin
+      --email $${AIRFLOW_ADMIN_EMAIL:-marbdejobmarketa@gmail.com}
+      || true
+      )
+      "
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: job_market_airflow_webserver
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    command: webserver
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: job_market_airflow_scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: scheduler
+
 volumes:
   postgres_data:
   pgadmin_data:
+  airflow_postgres_data:
+  airflow_logs:

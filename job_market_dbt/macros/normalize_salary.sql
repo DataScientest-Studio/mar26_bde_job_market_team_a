@@ -109,20 +109,18 @@ case
     when {{ frequency_expression }} = 'year'
         and {{ amount_expression }} between 8000 and 500000
         then {{ amount_expression }}
-    when {{ frequency_expression }} is null
-        and {{ amount_expression }} between 5 and 500000
-        then {{ amount_expression }}
     else null
 end
 {%- endmacro %}
 
--- Clé de dimension salaire construite seulement quand au moins une info utile existe
+-- La frequence est obligatoire pour exposer un salaire dans les marts
 {% macro salary_dimension_id(min_expression, max_expression, frequency_expression, month_count_expression, weekly_hours_expression, currency_expression) -%}
 case
-    when {{ min_expression }} is not null
-        or {{ max_expression }} is not null
-        or {{ frequency_expression }} is not null
-        or {{ currency_expression }} is not null
+    when {{ frequency_expression }} is not null
+        and (
+            {{ min_expression }} is not null
+            or {{ max_expression }} is not null
+        )
         then md5(
             coalesce({{ min_expression }}::text, '')
             || '|'

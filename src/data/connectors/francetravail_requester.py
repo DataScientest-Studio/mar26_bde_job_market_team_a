@@ -9,7 +9,7 @@ load_dotenv(".env")
 
 CLIENT_ID = os.getenv("FRANCE_TRAVAIL_CLIENT_ID") 
 CLIENT_SECRET = os.getenv("FRANCE_TRAVAIL_CLIENT_SECRET")
-TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL")
+TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL") # API's token endpoint
 API_BASE_URL = os.getenv("FRANCE_TRAVAIL_BASE_URL")
 SCOPES = os.getenv("FRANCE_TRAVAIL_SCOPE")
 
@@ -34,8 +34,11 @@ def get_access_token(client_id, client_secret, token_url):
             timeout=10
         )
         print(f"RESPONSE: {response}")
+
         response.raise_for_status()
+
         token_info = response.json()
+
         if "access_token" not in token_info:
             raise ValueError("No access_token found in response.")
 
@@ -61,6 +64,7 @@ def call_protected_api(api_url, token):
         response = requests.get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
         return response.json()
+    
     except requests.exceptions.RequestException as e:
         return None
 
@@ -91,7 +95,7 @@ def get_publiee_depuis_arg_nb(latest_ft):
     
     # Formattage du delta entre now et la dernière requete en une valeur absolue
     days_result_nb = abs((datetime.strptime(now_utc,format) - datetime.strptime(latest_ft,format)).days)
-    
+
     day_milestones_lst = [1,3,7,14,31]
 
     if days_result_nb not in day_milestones_lst:
@@ -111,6 +115,7 @@ def get_publiee_depuis_arg_nb(latest_ft):
     return days_result_nb
 
 def gather_data_from_api(target_regions_lst, target_departements_lst, access_token, update_bool=False, latest_ft=''):
+    exported_files = 0
 
     # Parcours des régions
     for target_region in target_regions_lst:
@@ -142,11 +147,12 @@ def gather_data_from_api(target_regions_lst, target_departements_lst, access_tok
                         publiee_depuis_arg = f"&publieeDepuis={nb_days}"
                         search_url = search_url+publiee_depuis_arg
                         print(f"Publiées depuis {publiee_depuis_arg}")
+
                     # Lancement de la requête
                     data = call_protected_api(search_url, access_token)
 
                     # Check de la reponse et du contenu renvoyé par l'API
-                    if data == None:
+                    if data is None:
                         print(f"{region_code}:{region_name} - {departement_name} : No data found after {first_index}.")
                         break
 
@@ -156,27 +162,24 @@ def gather_data_from_api(target_regions_lst, target_departements_lst, access_tok
 
                     # Regroupement des jobs dans une liste de pages
                     data_regionpages_lst.append(data)
-                export_to_json(data_regionpages_lst, region_code)
+                if data_regionpages_lst:
+                    export_to_json(data_regionpages_lst, region_code)
+                    exported_files += 1
+
+    return exported_files
 
 
 def initialize(update_bool=False, latest_ft='' ):
     # access token
     access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
-    print(f"Access Token: {access_token}")
+    print("[France Travail] Access token retrieved.")
 
     target_regions_lst = parse_json(REGION_CODES_PATH)
     target_departements_lst = parse_json(DEPARTEMENT_CODES_PATH)
-    gather_data_from_api(target_regions_lst, target_departements_lst, access_token, update_bool, latest_ft)
+    return gather_data_from_api(target_regions_lst, target_departements_lst, access_token, update_bool, latest_ft)
 
 if __name__ == "__main__":
     initialize()
 
 
-        export_to_json(data_regionpages_lst, region_code)
 
-if __name__ == "__main__":
-    access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
-    print(f"Access Token: {access_token}")
-
-    target_regions_lst = parse_region_codes()
-    gather_data_from_api(target_regions_lst, access_token)

@@ -72,6 +72,8 @@ models:
     columns:
       - name: salary_id
         tests: [not_null, unique]
+      - name: frequency
+        tests: [not_null]
 
   - name: dim_education
     columns:
