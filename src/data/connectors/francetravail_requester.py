@@ -9,7 +9,7 @@ load_dotenv(".env")
 
 CLIENT_ID = os.getenv("FRANCE_TRAVAIL_CLIENT_ID") 
 CLIENT_SECRET = os.getenv("FRANCE_TRAVAIL_CLIENT_SECRET")
-TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL") # API's token endpoint
+TOKEN_URL = os.getenv("FRANCE_TRAVAIL_TOKEN_URL")
 API_BASE_URL = os.getenv("FRANCE_TRAVAIL_BASE_URL")
 SCOPES = os.getenv("FRANCE_TRAVAIL_SCOPE")
 
@@ -34,11 +34,8 @@ def get_access_token(client_id, client_secret, token_url):
             timeout=10
         )
         print(f"RESPONSE: {response}")
-
         response.raise_for_status()
-
         token_info = response.json()
-
         if "access_token" not in token_info:
             raise ValueError("No access_token found in response.")
 
@@ -64,7 +61,6 @@ def call_protected_api(api_url, token):
         response = requests.get(api_url, headers=headers, timeout=10)
         response.raise_for_status()
         return response.json()
-    
     except requests.exceptions.RequestException as e:
         return None
 
@@ -176,4 +172,11 @@ if __name__ == "__main__":
     initialize()
 
 
+        export_to_json(data_regionpages_lst, region_code)
 
+if __name__ == "__main__":
+    access_token = get_access_token(CLIENT_ID, CLIENT_SECRET, TOKEN_URL)
+    print(f"Access Token: {access_token}")
+
+    target_regions_lst = parse_region_codes()
+    gather_data_from_api(target_regions_lst, access_token)

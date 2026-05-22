@@ -89,5 +89,10 @@ target/
 # Mypy cache
 .mypy_cache/
 
+# pickle files
+*.pkl
+
+# csv 
+*.csv
 # ignore history file
 /references/data_extraction/history.yml

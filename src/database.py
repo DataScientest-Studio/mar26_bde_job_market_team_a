@@ -8,6 +8,7 @@ The project follows the same environment convention everywhere:
 
 from __future__ import annotations
 
+from functools import lru_cache
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -83,7 +84,6 @@ def get_database_config() -> DatabaseConfig:
         schema=os.getenv("DBT_DEV_SCHEMA", "analytics"),
     )
 
-
 def create_database_engine() -> Engine:
     config = get_database_config()
     return create_engine(
@@ -96,7 +96,7 @@ def create_database_engine() -> Engine:
 _engine: Engine | None = None
 _engine_config: DatabaseConfig | None = None
 
-
+@lru_cache(maxsize=1)
 def get_engine() -> Engine:
     global _engine, _engine_config
 
