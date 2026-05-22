@@ -36,6 +36,8 @@ vars:
 
 models:
   job_market_dbt:
+    +pre-hook:
+      - "{{ set_statement_timeout() }}"
     staging:
       +materialized: ephemeral
     intermediate:

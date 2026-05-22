@@ -9,7 +9,7 @@ job_market_dbt:
       password: "{{ env_var('POSTGRES_PASSWORD', 'job_market') }}"
       dbname: "{{ env_var('POSTGRES_DB', 'job_market') }}"
       schema: "{{ env_var('DBT_DEV_SCHEMA', 'analytics') }}"
-      threads: 1
+      threads: "{{ env_var('DBT_DEV_THREADS', '4') | int }}"
     prod:
       type: postgres
       host: "{{ env_var('SUPABASE_DB_HOST', 'db.example.supabase.co') }}"
@@ -19,4 +19,4 @@ job_market_dbt:
       dbname: "{{ env_var('SUPABASE_DB_NAME', 'postgres') }}"
       schema: "{{ env_var('SUPABASE_DB_SCHEMA', 'analytics') }}"
       sslmode: require
-      threads: 1
+      threads: "{{ env_var('DBT_PROD_THREADS', '4') | int }}"

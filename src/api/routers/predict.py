@@ -1,68 +1,46 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 
-router = APIRouter(prefix="/predict", tags=["Machine Learning"])
+from src.api.schemas import (
+    PredictInput,
+    PredictionDetails,
+    PredictOutput,
+    RecommendationInput,
+    RecommendationOutput,
+    SalaryPredictionInput,
+    SalaryPredictionOutput,
+)
+from src.models.predict_models import predict_market_score, predict_salary_amount, recommend_jobs
 
-
-@router.get("")
-def predict(
-    skills: str = Query(..., description="Competences separees par des virgules. Exemple: python,sql,airflow"),
-    experience_years: int = Query(..., ge=0, description="Nombre d'annees d'experience_years"),
-    expected_salary: float = Query(..., ge=0, description="Salaire attendu"),
-    location: str | None = Query(None, description="Localisation souhaitee"),
-    contract: str | None = Query(None, description="Type de contrat souhaite"),
-) -> dict:
-    skill_list = [skill.strip().lower() for skill in skills.split(",") if skill.strip()]
-
-    return {
-        "input": {
-            "skills": skill_list,
-            "experience_years": experience_years,
-            "expected_salary": expected_salary,
-            "location": location,
-            "contract": contract,
-        },
-        "prediction": {
-            "score": None,
-            "message": "Endpoint pret. Branchez ici le modele ML quand il sera entraine.",
-        },
-    }
+router = APIRouter(prefix="/predict", tags=["Prédictions"])
 
 
-@router.get("/salary")
-def predict_salary(
-    job_title: str = Query(..., description="Intitule du poste"),
-    experience_years: int = Query(..., ge=0, description="Nombre d'annees d'experience_years"),
-    skills: str | None = Query(None, description="Competences separees par des virgules"),
-) -> dict:
-    skill_list = []
-    if skills:
-        skill_list = [skill.strip().lower() for skill in skills.split(",") if skill.strip()]
-
-    return {
-        "input": {
-            "job_title": job_title,
-            "experience_years": experience_years,
-            "skills": skill_list,
-        },
-        "predicted_salary": None,
-        "message": "Prediction salaire a connecter au modele ML.",
-    }
+@router.post("", response_model=PredictOutput)
+def predict(payload: PredictInput) -> PredictOutput:
+    score = predict_market_score(payload)
+    return PredictOutput(
+        input=payload,
+        prediction=PredictionDetails(
+            score=score,
+            message="Score calculé avec le modèle ML entraîné sur les offres PostgreSQL.",
+        ),
+    )
 
 
-@router.get("/recommendation")
-def predict_recommendation(
-    skills: str = Query(..., description="Competences separees par des virgules"),
-    experience_years: int = Query(..., ge=0),
-    location: str | None = None,
-) -> dict:
-    skill_list = [skill.strip().lower() for skill in skills.split(",") if skill.strip()]
+@router.post("/salary", response_model=SalaryPredictionOutput)
+def predict_salary(payload: SalaryPredictionInput) -> SalaryPredictionOutput:
+    predicted_salary = predict_salary_amount(payload)
+    return SalaryPredictionOutput(
+        input=payload,
+        predicted_salary=predicted_salary,
+        message="Salaire estimé à partir des offres similaires issues du modèle ML.",
+    )
 
-    return {
-        "input": {
-            "skills": skill_list,
-            "experience_years": experience_years,
-            "location": location,
-        },
-        "recommended_jobs": [],
-        "message": "Recommendations a connecter au modele de matching.",
-    }
+
+@router.post("/recommendation", response_model=RecommendationOutput)
+def predict_recommendation(payload: RecommendationInput) -> RecommendationOutput:
+    recommended_jobs = recommend_jobs(payload)
+    return RecommendationOutput(
+        input=payload,
+        recommended_jobs=recommended_jobs,
+        message="Recommandations calculées à partir des offres PostgreSQL similaires.",
+    )

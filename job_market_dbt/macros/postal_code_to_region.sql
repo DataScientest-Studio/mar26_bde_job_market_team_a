@@ -1,3 +1,4 @@
+-- Mapping minimal des deux premiers chiffres du code postal vers une région
 {% macro postal_code_to_region(postal_code_expr) %}
     {% set postal_code_regions = var('postal_code_regions') %}
     case

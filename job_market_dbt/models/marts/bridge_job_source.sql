@@ -1,6 +1,5 @@
-/*  garde la traçabilité multi-sources */
 select
-    md5(job_id || '|' || normalized_offer_id) as job_source_id,
+    job_source_id,
     job_id,
     normalized_offer_id,
     source_system,
