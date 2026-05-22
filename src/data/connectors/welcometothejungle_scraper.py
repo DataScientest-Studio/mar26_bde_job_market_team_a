@@ -3,6 +3,7 @@ import pprint
 
 import yaml
 from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from src.data.connectors.scrapesearchpage import scrape_search_page_to_dict
@@ -100,7 +101,11 @@ def initialize():
 
             print(f"[Job details] {counter} / {total_unique_jobs} - {job_title}")
 
-            details = get_jobinfo(driver, job_url, scraping_dict["job_page"])
+            try:
+                details = get_jobinfo(driver, job_url, scraping_dict["job_page"])
+            except WebDriverException as exc:
+                print(f"[Job details] skipped {job_url}: {exc.__class__.__name__}")
+                continue
             details["region"] = job_region
             job_results_dict[job_url] = details
 
