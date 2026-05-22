@@ -215,7 +215,6 @@ class RecommendedJob(BaseModel):
     title: str | None = None
     company: str | None = None
     location: str | None = None
-    score: float | None = None
 
 
 class RecommendationOutput(BaseModel):
