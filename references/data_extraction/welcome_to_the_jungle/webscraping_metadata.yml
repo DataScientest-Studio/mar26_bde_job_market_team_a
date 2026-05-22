@@ -3,9 +3,9 @@ entry_page:
   entry_page_region_block_class: sc-imZCey.zKhXr
   search_tags_class: sc-fibHhp.bVuVNb
   link_presence: a[href^='/fr/pages/emploi']
-  
+
 search_page:
-  job_title: a[href^='/fr/companies/'][href*='/jobs/']
+  job_title: a[href^='/fr/companies/'] h2
 
 job_page:
   job_title_class: sc-TezEC.iVXHnU.wui-text
