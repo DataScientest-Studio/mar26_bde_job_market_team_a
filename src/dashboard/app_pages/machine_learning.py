@@ -46,7 +46,7 @@ def render_ml_page(api_base_url: str) -> None:
         st.metric("Precision", compact_number(metric_value(metrics, "recommendation_precision")))
         st.metric("Recall", compact_number(metric_value(metrics, "recommendation_recall")))
         st.metric("F1-score", compact_number(metric_value(metrics, "recommendation_f1")))
-        st.caption(f"Modèle: {ml_stats.get('recommendation_model')} | Préfiltre: {ml_stats.get('candidate_prefilter')}")
+        st.caption(f"Modèle: {ml_stats.get('ranking_model')} | Préfiltre: {ml_stats.get('candidate_prefilter')}")
 
     with metric_cols[1].container(border=True):
         st.subheader("Salaire")

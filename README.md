@@ -245,7 +245,7 @@ générés depuis les offres PostgreSQL :
 Le modèle de recommandation est une `LogisticRegression`. Il apprend à prédire
 la probabilité qu'un couple profil candidat / offre corresponde à un bon match.
 L'endpoint `POST /predict/recommendation` utilise ensuite
-`recommendation_model.predict_proba(...)` pour scorer les offres candidates.
+`ranking_model.predict_proba(...)` pour scorer les offres candidates.
 
 L'évaluation utilise aussi un `train_test_split` avec stratification sur le
 label :

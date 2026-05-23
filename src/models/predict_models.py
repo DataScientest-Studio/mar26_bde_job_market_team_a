@@ -64,9 +64,8 @@ def get_model_stats() -> dict:
     artifacts = load_model_artifacts()
     return {
         "training_rows": len(artifacts.training_df),
-        "encoded_skills": len(artifacts.mlb.classes_),
-        "recommendation_features": len(artifacts.recommendation_columns),
-        "salary_features": len(artifacts.salary_columns),
+        "encoded_skills": len(artifacts.mlbs["skills"].classes_),
+        "encoded_contracts": len(artifacts.mlbs["contract"].classes_),
         "ranking_model": type(artifacts.ranking_model).__name__,
         "salary_model": type(artifacts.salary_model).__name__,
         "candidate_prefilter": type(artifacts.kmeans_model).__name__,

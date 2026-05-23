@@ -95,7 +95,7 @@ class JobMarketModelArtifacts:
     Tous les objets créés pendant l'entraînement ML.
 
     - training_df : données nettoyées issues de PostgreSQL ;
-    - mlb : encodeur multi-hot des compétences ;
+    - mlbs : encodeur multi-hot des compétences ;
     - kmeans_scaler / salary_scaler : standardisation des variables ;
     - ranking_scaler : standardisation des variables user-job ;
     - kmeans_model : modèle de clusters pour les recommandations ;
