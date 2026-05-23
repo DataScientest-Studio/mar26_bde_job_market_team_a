@@ -144,7 +144,6 @@ def predict_salary_amount(payload: SalaryPredictionInput) -> float | None:
     salary = float(artifacts.salary_model.predict(user_vector_scaled)[0])
     return round(salary, 2)
 
-
 def recommend_jobs(payload: RecommendationInput) -> list[RecommendedJob]:
     _, candidates = _candidate_jobs(payload)
     jobs = retrieve_jobs()
@@ -158,7 +157,8 @@ def recommend_jobs(payload: RecommendationInput) -> list[RecommendedJob]:
             job_id=str(row["job_id"]),
             title=_optional_text(row.get("job_title")),
             company=_optional_text(row.get("company_name")),
-            location=_optional_text(row.get("location"))
+            location=_optional_text(row.get("location")),
+            salary=_optional_text(row.get("salary"))
         )
         for _, row in jobs[jobs["job_id"].isin(ranked_candidates["job_id"])].iterrows()
     ]

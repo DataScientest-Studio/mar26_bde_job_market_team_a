@@ -1,141 +1,226 @@
-from __future__ import annotations
-
-import pandas as pd
-import requests
-import streamlit as st
-
-from src.dashboard.call_api import load_lookups, load_ml_stats, post_api
-from src.dashboard.ui import compact_currency, compact_number, lookup_options, metric_value, optional_select
+from pydantic import BaseModel, ConfigDict, Field
 
 
-def render_ml_page(api_base_url: str) -> None:
-    st.title("Machine Learning")
-    st.caption("Prédiction de salaire et recommandation d'offres via l'API FastAPI.")
+class SectorTrend(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-    try:
-        with st.spinner("Chargement des artefacts ML et des listes de valeurs..."):
-            ml_stats = load_ml_stats(api_base_url)
-            lookups = load_lookups(api_base_url)
-    except requests.RequestException as exc:
-        st.error(f"API indisponible: {api_base_url}")
-        st.caption(str(exc))
-        st.stop()
+    sector: str
+    year: int
+    nb_offres: int
 
-    metrics = ml_stats.get("metrics", {})
 
-    overview_cols = st.columns(4)
-    overview_cols[0].metric("Offres d'entraînement", compact_number(ml_stats.get("training_rows"), digits=0))
-    overview_cols[1].metric("Compétences encodées", compact_number(ml_stats.get("encoded_skills"), digits=0))
-    overview_cols[2].metric("F1 recommandation", compact_number(metric_value(metrics["ranking"], "ranking_f1")))
-    overview_cols[3].metric("MAE salaire", compact_currency(metric_value(metrics["salary"], "salary_mae")))
+class RegionTrend(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-    with st.container(border=True):
-        st.subheader("Pipeline ML")
-        flow_cols = st.columns(5)
-        flow_cols[0].markdown("**1. PostgreSQL**\n\nTables `analytics`")
-        flow_cols[1].markdown("**2. Préparation**\n\nNettoyage, encodage, standardisation")
-        flow_cols[2].markdown("**3. Évaluation**\n\nTrain/test split 80/20")
-        flow_cols[3].markdown("**4. Artefacts**\n\nModèles sauvegardés")
-        flow_cols[4].markdown("**5. API**\n\nPrédictions dynamiques")
+    region: str
+    year: int
+    nb_offres: int
 
-    metric_cols = st.columns(2)
-    with metric_cols[0].container(border=True):
-        st.subheader("Recommandation")
-        st.caption("Classification avec labels synthétiques. Les métriques valident surtout le pipeline ML.")
-        st.metric("Accuracy", compact_number(metric_value(metrics["ranking"], "ranking_accuracy")))
-        st.metric("Precision", compact_number(metric_value(metrics["ranking"], "ranking_precision")))
-        st.metric("Recall", compact_number(metric_value(metrics["ranking"], "ranking_recall")))
-        st.metric("F1-score", compact_number(metric_value(metrics["ranking"], "ranking_f1")))
-        st.caption(f"Modèle: {ml_stats.get('ranking_model')} | Préfiltre: {ml_stats.get('candidate_prefilter')}")
 
-    with metric_cols[1].container(border=True):
-        st.subheader("Salaire")
-        st.caption("Régression supervisée avec `salary` comme variable cible.")
-        st.metric("MAE", compact_currency(metric_value(metrics["salary"], "salary_mae")))
-        st.metric("RMSE", compact_currency(metric_value(metrics["salary"], "salary_rmse")))
-        st.metric("R2", compact_number(metric_value(metrics["salary"], "salary_r2")))
-        st.caption(f"Modèle: {ml_stats.get('salary_model')}")
+class ContractTrend(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-    st.subheader("Tester une prédiction")
-    skill_values, skill_labels = lookup_options(lookups, "skills")
-    contract_values, contract_labels = lookup_options(lookups, "contracts")
-    remote_values, remote_labels = lookup_options(lookups, "remote")
-    education_values, education_labels = lookup_options(lookups, "education")
-    industry_values, industry_labels = lookup_options(lookups, "industries")
-    location_values, location_labels = lookup_options(lookups, "locations")
-    title_values, title_labels = lookup_options(lookups, "job_titles")
+    contract_type: str
+    year: int
+    nb_offres: int
 
-    with st.form("ml_prediction_form"):
-        form_cols = st.columns(2)
-        with form_cols[0]:
-            job_title = optional_select("Intitulé recherché", title_values, title_labels)
-            selected_skills = st.multiselect(
-                "Compétences",
-                options=skill_values,
-                default=skill_values[:2],
-                format_func=lambda value: skill_labels.get(value, value),
-            )
-            experience_years = st.number_input("Années d'expérience", min_value=0.0, max_value=45.0, value=2.0, step=0.5)
-            expected_salary = st.number_input("Salaire attendu annuel", min_value=0.0, value=28_000.0, step=1_000.0)
 
-        with form_cols[1]:
-            location = optional_select("Localisation", location_values, location_labels)
-            contract_type = optional_select("Contrat", contract_values, contract_labels)
-            remote = optional_select("Télétravail", remote_values, remote_labels)
-            education_level = optional_select("Formation", education_values, education_labels)
-            industry = optional_select("Secteur", industry_values, industry_labels)
-            limit = st.slider("Nombre de recommandations", min_value=1, max_value=10, value=5)
+class SalaryByJob(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-        submitted = st.form_submit_button("Lancer les prédictions", width="stretch")
+    job_title: str
+    year: int
+    avg_salary: float
+    nb_offres: int
 
-    payload = {
-        "skills": selected_skills,
-        "experience_years": experience_years,
-        "expected_salary": expected_salary,
-        "job_title": job_title,
-        "location": location,
-        "contract_type": contract_type,
-        "remote": remote,
-        "education_level": education_level,
-        "industry": industry,
-    }
 
-    if not submitted:
-        return
+class SkillTrend(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-    try:
-        salary_payload = {
-            "job_title": job_title or "Non renseigné",
-            "experience_years": experience_years,
-            "skills": selected_skills,
-            "location": location,
-            "contract_type": contract_type,
-            "remote": remote,
-            "education_level": education_level,
-            "industry": industry,
+    skill_name: str
+    skill_category: str
+    nb_offres: int
+
+
+class AdvantageTrend(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    advantage_name: str
+    nb_offres: int
+
+
+class SourceTrend(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    source_system: str
+    nb_offres: int
+
+
+class MLModelStats(BaseModel):
+    training_rows: int
+    encoded_skills: int
+    encoded_contracts: int
+    ranking_model: str
+    salary_model: str
+    candidate_prefilter: str
+    metrics: dict[str, dict[str, float | str | dict]]
+
+
+class AnalyticsSummary(BaseModel):
+    total_offers: int
+    top_sector: str | None = None
+    top_region: str | None = None
+    top_contract: str | None = None
+    avg_salary: float | None = None
+
+
+class SalaryBreakdown(BaseModel):
+    label: str
+    avg_salary: float
+    nb_offres: int
+
+
+class OfferBreakdown(BaseModel):
+    label: str
+    nb_offres: int
+
+
+class DashboardStats(BaseModel):
+    sector: list[SectorTrend]
+    region: list[RegionTrend]
+    contract: list[ContractTrend]
+    salary: list[SalaryByJob]
+    skill: list[SkillTrend]
+    advantage: list[AdvantageTrend]
+    source: list[SourceTrend]
+
+
+class LookupValue(BaseModel):
+    value: str
+    label: str
+    count: int | None = None
+
+
+class DashboardLookups(BaseModel):
+    skills: list[LookupValue]
+    contracts: list[LookupValue]
+    remote: list[LookupValue]
+    education: list[LookupValue]
+    industries: list[LookupValue]
+    locations: list[LookupValue]
+    job_titles: list[LookupValue]
+
+
+class CandidateProfileInput(BaseModel):
+    skills: list[str] = Field(
+        default_factory=list,
+        description="Compétences du candidat. Valeurs disponibles via GET /lookups/skills.",
+    )
+    experience_years: int = Field(ge=0, description="Nombre d'années d'expérience.")
+    expected_salary: float | None = Field(default=None, ge=0, description="Salaire annuel attendu en euros.")
+    location: str | None = Field(default=None, description="Localisation souhaitee. Valeurs via GET /lookups/locations.")
+    contract_type: str | None = Field(default=None, description="Type de contrat. Valeurs via GET /lookups/contracts.")
+    remote: str | None = Field(default=None, description="Préférence télétravail. Valeurs via GET /lookups/remote.")
+    education_level: str | None = Field(default=None, description="Niveau de formation. Valeurs via GET /lookups/education.")
+    industry: str | None = Field(default=None, description="Secteur cible. Valeurs via GET /lookups/industries.")
+
+
+class PredictInput(CandidateProfileInput):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "skills": ["faire preuve d'autonomie", "travailler en équipe"],
+                "experience_years": 2,
+                "expected_salary": 28000,
+                "job_title": "Aide-soignant / Aide-soignante",
+                "location": "CAEN, normandie",
+                "contract_type": "CDI",
+                "remote": "Non précisé",
+                "education_level": "Bac",
+                "industry": "Santé",
+            }
         }
-        ranking_payload = {**payload, "limit": limit}
-        with st.spinner("Calcul des prédictions..."):
-            salary_result = post_api(api_base_url, "/predict/salary", salary_payload)
-            ranking_result = post_api(api_base_url, "/predict/recommendation", ranking_payload)
-    except requests.RequestException as exc:
-        st.error("Prédiction impossible pour le moment.")
-        st.caption(str(exc))
-        return
+    )
 
-    result_cols = st.columns([1, 1, 2])
+    job_title: str | None = Field(default=None, description="Intitulé de poste cible. Valeurs via GET /lookups/job-titles.")
 
-    with result_cols[1].container(border=True):
-        st.subheader("Salaire prédit")
-        st.metric("Salaire annuel", compact_currency(salary_result.get("predicted_salary")))
 
-    with result_cols[2].container(border=True):
-        st.subheader("Offres recommandées")
-        recommendations = pd.DataFrame(ranking_result.get("recommended_jobs", [])).drop(columns=["job_id"])
-        if recommendations.empty:
-            st.info("Aucune recommandation disponible pour ce profil.")
-        else:
-            st.dataframe(recommendations, width="stretch", hide_index=True)
+class SalaryPredictionInput(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "job_title": "Aide-soignant / Aide-soignante",
+                "experience_years": 2,
+                "skills": ["faire preuve d'autonomie", "travailler en équipe"],
+                "location": "CAEN, normandie",
+                "contract_type": "CDI",
+                "remote": "Non précisé",
+                "education_level": "Bac",
+                "industry": "Santé",
+            }
+        }
+    )
 
-    with st.expander("Payload envoyé à l'API"):
-        st.json({"salary": salary_payload, "recommendation": ranking_payload})
+    job_title: str = Field(description="Intitulé du poste. Valeurs via GET /lookups/job-titles.")
+    experience_years: float = Field(ge=0, description="Nombre d'années d'expérience.")
+    skills: list[str] = Field(default_factory=list, description="Compétences utiles. Valeurs via GET /lookups/skills.")
+    location: str | None = Field(default=None, description="Localisation du poste. Valeurs via GET /lookups/locations.")
+    contract_type: str | None = Field(default=None, description="Type de contrat. Valeurs via GET /lookups/contracts.")
+    remote: str | None = Field(default=None, description="Modalité télétravail. Valeurs via GET /lookups/remote.")
+    education_level: str | None = Field(default=None, description="Niveau de formation. Valeurs via GET /lookups/education.")
+    industry: str | None = Field(default=None, description="Secteur d'activité. Valeurs via GET /lookups/industries.")
+
+
+class RecommendationInput(CandidateProfileInput):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "skills": ["faire preuve d'autonomie", "travailler en équipe"],
+                "experience_years": 2,
+                "expected_salary": 28000,
+                "job_title": "Aide-soignant / Aide-soignante",
+                "location": "CAEN, normandie",
+                "contract_type": "CDI",
+                "remote": "Non précisé",
+                "education_level": "Bac",
+                "industry": "Santé",
+                "limit": 10,
+            }
+        }
+    )
+
+    job_title: str | None = Field(default=None, description="Intitulé de poste recherché. Valeurs via GET /lookups/job-titles.")
+    limit: int = Field(default=10, ge=1, le=50, description="Nombre maximum de recommandations.")
+
+    def __hash__(self):
+        return hash((self.location, self.experience_years, self.expected_salary, tuple(self.skills), self.contract_type))
+
+
+class PredictionDetails(BaseModel):
+    score: float | None = None
+    message: str
+
+
+class PredictOutput(BaseModel):
+    input: PredictInput
+    prediction: PredictionDetails
+
+
+class SalaryPredictionOutput(BaseModel):
+    input: SalaryPredictionInput
+    predicted_salary: float | None = None
+    message: str
+
+
+class RecommendedJob(BaseModel):
+    job_id: str
+    title: str | None = None
+    company: str | None = None
+    location: str | None = None
+    salary: float | None = None
+
+
+class RecommendationOutput(BaseModel):
+    input: RecommendationInput
+    recommended_jobs: list[RecommendedJob]
+    message: str
