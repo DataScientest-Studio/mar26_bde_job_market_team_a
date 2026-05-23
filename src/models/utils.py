@@ -1,11 +1,11 @@
 from functools import lru_cache
-
+import os
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MultiLabelBinarizer
 from sqlalchemy import func
 from sqlmodel import case, select
-from src.api.models import Contract, JobOffer, Location, Salary, JobSkill, Skill
+from src.api.models import Company, Contract, JobOffer, JobType, Location, Salary, JobSkill, Skill
 from src.database import get_engine
 
 def encode_experience(years: float) -> int:
@@ -45,25 +45,26 @@ def salary_bucket(salary: float) -> int:
         return 1
     return 2
 
-def encode_user_input(user_input: pd.DataFrame, mlbs: dict[str, MultiLabelBinarizer]) -> np.ndarray:
+def encode_user_input(user_input: pd.DataFrame, mlbs: dict[str, MultiLabelBinarizer]) -> pd.DataFrame:
     # Skills
     skills_vec = mlbs["skills"].transform([user_input["skills"]])
     # Experience
     exp = encode_experience(user_input["experience_years"])
     # Salary
-    salary_bucket = salary_bucket(user_input["salary"])
+    salary_buck = salary_bucket(user_input["expected_salary"])
     # Contract type
-    contract_vec = mlbs["contract_type"].transform([[user_input["contract_type"]]])
+    contract_vec = mlbs["contract"].transform([[user_input["contract_preference"]]])
     # Combine
     user_vector = np.concatenate([
         skills_vec[0],
         contract_vec[0],
-        [exp, salary_bucket]
+        [exp, salary_buck]
     ])
-    return user_vector
+    columns = list(mlbs["skills"].classes_) + list(mlbs["contract"].classes_) + ["exp_level", "salary_bucket"]
+    return pd.DataFrame(data=[user_vector.flatten()], columns=columns)
 
 @lru_cache(maxsize=1)
-def find_top_skills(limit=50) -> list[str]:
+def find_top_skills() -> list[str]:
     engine = get_engine()
     skill_count = func.count(func.distinct(JobSkill.job_id)).label("skill_count")
     statement = (
@@ -72,7 +73,7 @@ def find_top_skills(limit=50) -> list[str]:
         .where(func.nullif(Skill.skill_name, "").is_not(None))
         .group_by(Skill.skill_name)
         .order_by(skill_count.desc(), Skill.skill_name)
-        .limit(limit)
+        .limit(os.getenv('ML_SKILL_LIMIT'))
     )
 
     # Execute query and load data into DataFrame
@@ -84,6 +85,8 @@ def find_top_skills(limit=50) -> list[str]:
 def retrieve_jobs() -> pd.DataFrame:
     engine = get_engine()
     job_id = JobOffer.job_id.label("job_id")
+    job_title = JobType.title.label("job_title")
+    company_name = Company.name.label("company_name")
     experience_years = JobOffer.experience_years.label("experience_years")
     contract_type = Contract.contract_type.label("contract_type")
     salary_amount = (func.coalesce((Salary.salary_min + Salary.salary_max) / 2)).label("salary")
@@ -98,15 +101,17 @@ def retrieve_jobs() -> pd.DataFrame:
     location = func.concat(Location.city, ",", Location.region).label("location")
 
     statement = (
-        select(job_id, experience_years, contract_type, annual_salary, skills, location)
+        select(job_id, job_title, company_name, experience_years, contract_type, annual_salary, skills, location)
         .select_from(JobOffer)
         .join(Salary, JobOffer.salary_id == Salary.salary_id)
         .join(Contract, JobOffer.contract_type_id == Contract.contract_type_id)
+        .join(JobType, JobOffer.job_type_id == JobType.job_type_id)
         .join(JobSkill, JobOffer.job_id == JobSkill.job_id)
         .join(Skill, JobSkill.skill_id == Skill.skill_id)
+        .join(Company, JobOffer.company_id == Company.company_id)
         .join(Location, JobOffer.location_id == Location.location_id)
         .where(annual_salary.between(10000, 200000))
-        .group_by(JobOffer.job_id, JobOffer.experience_years, Contract.contract_type, annual_salary, location)
+        .group_by(job_id, job_title, company_name, experience_years, contract_type, annual_salary, location)
     )
 
     # Execute query and load data into DataFrame
@@ -114,7 +119,7 @@ def retrieve_jobs() -> pd.DataFrame:
     return df
 
 def skill_match_score(user_skills, job_skills) -> float:
-    return len(set(user_skills) & set(job_skills)) / len(set(job_skills)) if job_skills else 0
+    return len(set(user_skills) & set(job_skills)) / len(set(job_skills)) if job_skills else 0.
 
 def experience_years_score(user_experience, required_experience) -> float:
     return 1. - abs(user_experience - required_experience) / required_experience if required_experience != 0. else 1.

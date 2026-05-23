@@ -89,9 +89,6 @@ from src.models.utils import (
 )
 
 
-MODEL_ARTIFACTS_FILENAME = "job_market_model_artifacts.pkl"
-LABEL_THRESHOLD = 0.7
-
 @dataclass
 class JobMarketModelArtifacts:
     """
@@ -115,6 +112,7 @@ class JobMarketModelArtifacts:
     ranking_model: LogisticRegression
     salary_model: KNeighborsRegressor
     metrics: dict[str, dict[str, float]]
+    top_skills: list[str]
 
 
 def get_model_dir(model_dir: str | Path | None = None) -> Path:
@@ -131,7 +129,7 @@ def get_model_dir(model_dir: str | Path | None = None) -> Path:
 
 
 def get_model_artifacts_path(model_dir: str | Path | None = None) -> Path:
-    return get_model_dir(model_dir) / MODEL_ARTIFACTS_FILENAME
+    return get_model_dir(model_dir) / os.getenv("MODEL_ARTIFACTS_FILENAME")
 
 
 def save_job_market_artifacts(artifacts: JobMarketModelArtifacts, model_dir: str | Path | None = None) -> Path:
@@ -145,7 +143,7 @@ def save_job_market_artifacts(artifacts: JobMarketModelArtifacts, model_dir: str
     model_path.mkdir(parents=True, exist_ok=True)
 
     # TODO Add versionining to artifacts and filename for better tracking of model versions
-    artifacts_path = model_path / MODEL_ARTIFACTS_FILENAME
+    artifacts_path = model_path / os.getenv("MODEL_ARTIFACTS_FILENAME")
     joblib.dump(artifacts, artifacts_path)
     return artifacts_path
 
@@ -163,7 +161,7 @@ def load_job_market_artifacts(model_dir: str | Path | None = None) -> JobMarketM
     return artifacts
 
 
-def clean_training_data(df: pd.DataFrame) -> pd.DataFrame:
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Nettoyage des données avant entraînement.
 
@@ -174,51 +172,16 @@ def clean_training_data(df: pd.DataFrame) -> pd.DataFrame:
     - compétences : suppression des valeurs vides, puis suppression des offres
       sans compétence.
     """
+    top_skills = set(find_top_skills())
     cleaned = df.copy()
-    cleaned["experience_years"] = pd.to_numeric(cleaned["experience_years"], errors="coerce").fillna(0)
-    cleaned["salary"] = pd.to_numeric(cleaned["salary"], errors="coerce")
-    cleaned["skills"] = cleaned["skills"].apply(
-        lambda skills: sorted({str(skill).strip().lower() for skill in skills if str(skill).strip()})
-    )
+    cleaned["skills"] = cleaned["skills"].apply(lambda skills: [skill for skill in skills if skill in top_skills])
+    cleaned = cleaned[cleaned["skills"].apply(len) > 0]
 
-    cleaned = cleaned.dropna(subset=["id", "salary"])
-    cleaned = cleaned[cleaned["skills"].apply(bool)]
-    return cleaned.reset_index(drop=True)
-
-
-def _job_row_to_user_input(job: pd.Series) -> dict:
-    return {
-        "skills": list(job["skills"]),
-        "experience_years": float(job["experience_years"]),
-        "salary": float(job["salary"]),
-        "job_title": job.get("title"),
-        "location": job.get("location"),
-        "contract_type": job.get("contract_type"),
-        "remote": job.get("remote"),
-        "industry": job.get("industry"),
-        "education_level": job.get("education_level"),
-    }
-
-
-def clean_training_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Nettoyage des données avant entraînement.
-
-    Étape "suppression/traitement des nulls" de la fiche ML :
-    - salaire : variable cible pour la régression, donc on supprime les lignes
-      sans salaire exploitable ;
-    - experience_years : valeur numérique manquante remplacée par 0 an ;
-    - compétences : suppression des valeurs vides, puis suppression des offres
-      sans compétence.
-    """
-    top_skills = set(find_top_skills(limit=os.getenv('ML_SKILL_LIMIT')))
-    cleaned = df.copy()
     cleaned["experience_years"] = pd.to_numeric(cleaned["experience_years"], errors="coerce").fillna(0)
     cleaned["salary"] = pd.to_numeric(cleaned["salary"], errors="coerce")
 
     cleaned = cleaned.dropna(subset=["job_id", "salary"])
     cleaned = cleaned.reset_index(drop=True)
-    cleaned["skills"] = cleaned["skills"].apply(lambda skills: [skill for skill in skills if skill in top_skills])
     return cleaned
 
 
@@ -246,7 +209,7 @@ def transform_features(clean_training_df: pd.DataFrame) -> tuple[pd.DataFrame, d
     clean_training_df["exp_level"] = clean_training_df["experience_years"].apply(encode_experience)
     clean_training_df["salary_bucket"] = clean_training_df["salary"].apply(salary_bucket)
 
-    transformmed_df = pd.concat([contract_df, skills_df, clean_training_df[["job_id", "salary", "exp_level", "salary_bucket"]]], axis=1)
+    transformmed_df = pd.concat([skills_df, contract_df, clean_training_df[["job_id", "salary", "exp_level", "salary_bucket"]]], axis=1)
     mlbs = {
         "skills": mlb_skills,
         "contract": mlb_contract
@@ -254,17 +217,13 @@ def transform_features(clean_training_df: pd.DataFrame) -> tuple[pd.DataFrame, d
     return transformmed_df, mlbs
 
 
-def scale_features(transformed_df: pd.DataFrame, columns: list[str] = None) -> tuple[StandardScaler, pd.DataFrame]:
+def scale_features(transformed_df: pd.DataFrame) -> tuple[StandardScaler, pd.DataFrame]:
     """
     Standardisation :
     - StandardScaler centre/réduit les variables avant les modèles à distance.
     """
     scaler = StandardScaler()
-    X_scaled = pd.DataFrame(
-        scaler.fit_transform(transformed_df),
-        columns=columns if columns else transformed_df.columns,
-        index=transformed_df.index,
-    )
+    X_scaled = scaler.fit_transform(transformed_df)
 
     return scaler, X_scaled
 
@@ -297,6 +256,7 @@ def get_features_for_job(job: pd.Series, user: dict) -> dict:
     }
 
 def generate_training_data(jobs: pd.DataFrame) -> pd.DataFrame:
+    threshold = float(os.getenv("LABEL_THRESHOLD"))
     training_rows = []
 
     for _, job in jobs.iterrows():
@@ -310,9 +270,8 @@ def generate_training_data(jobs: pd.DataFrame) -> pd.DataFrame:
 
         # Perfect match
         score = relevance_score(user, job)
-
         training_rows.append(get_features_for_job(job, user) | {
-            "label": int(score > LABEL_THRESHOLD)
+            "label": int(score > threshold)
         })
 
         # Different jobs for sampling
@@ -321,6 +280,6 @@ def generate_training_data(jobs: pd.DataFrame) -> pd.DataFrame:
         for _, rand_job in random_jobs.iterrows():
             rand_job_score = relevance_score(user, rand_job)
             training_rows.append(get_features_for_job(rand_job, user) | {
-                "label": int(rand_job_score > LABEL_THRESHOLD)
+                "label": int(rand_job_score > threshold)
             })
     return pd.DataFrame(training_rows)

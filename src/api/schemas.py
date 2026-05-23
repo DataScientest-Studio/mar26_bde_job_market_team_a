@@ -117,7 +117,7 @@ class CandidateProfileInput(BaseModel):
         default_factory=list,
         description="Compétences du candidat. Valeurs disponibles via GET /lookups/skills.",
     )
-    experience_years: float = Field(ge=0, description="Nombre d'années d'expérience.")
+    experience_years: int = Field(ge=0, description="Nombre d'années d'expérience.")
     expected_salary: float | None = Field(default=None, ge=0, description="Salaire annuel attendu en euros.")
     location: str | None = Field(default=None, description="Localisation souhaitee. Valeurs via GET /lookups/locations.")
     contract_type: str | None = Field(default=None, description="Type de contrat. Valeurs via GET /lookups/contracts.")

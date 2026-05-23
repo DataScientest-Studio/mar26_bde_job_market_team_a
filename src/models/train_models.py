@@ -1,5 +1,6 @@
-from pathlib import Path
+import os
 import pandas as pd
+from pathlib import Path
 
 from sklearn.cluster import KMeans
 from sklearn.linear_model import LogisticRegression
@@ -12,14 +13,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor
 
 from src.models.features_preparation import (
-    clean_training_data, transform_features, scale_features, generate_training_data,
+    clean_data, transform_features, scale_features, generate_training_data,
     save_job_market_artifacts, JobMarketModelArtifacts
 )
 from src.models.utils import find_top_skills, retrieve_jobs
 
-
-def _fit_kmeans_model(X_scaled: object) -> KMeans:
-    kmeans = KMeans(n_clusters=15, random_state=42)
+def _fit_kmeans_model(X_scaled: pd.DataFrame) -> KMeans:
+    kmeans = KMeans(n_clusters=int(os.getenv("ML_N_CLUSTERS_KMEANS")), random_state=42)
     kmeans.fit(X_scaled)
     return kmeans
 
@@ -39,7 +39,6 @@ def _fit_ranking_model(X_scaled: pd.DataFrame, label: pd.Series) -> LogisticRegr
     Entraîne le modèle final de recommandation sur toutes les données.
     """
     model = LogisticRegression(max_iter=1000, class_weight="balanced")
-    print("Label distribution:\n", label.value_counts())
     model.fit(X_scaled, label)
     return model
 
@@ -76,7 +75,7 @@ def ml_train_pipeline(model_dir: str | Path | None = None) -> JobMarketModelArti
     find_top_skills.cache_clear()
 
     training_df = retrieve_jobs()
-    clean_training_df = clean_training_data(training_df)
+    clean_training_df = clean_data(training_df)
 
     if training_df.empty:
         raise ValueError("Impossible d'entraîner un modèle sur un dataset vide.")
@@ -99,11 +98,10 @@ def ml_train_pipeline(model_dir: str | Path | None = None) -> JobMarketModelArti
         stratify=ranking_training_df["label"]
     )
     ranking_scaler, X_train_scaled = scale_features(X_ranking_train)
-    ranking_model = _fit_ranking_model(X_ranking_train, y_ranking_train)
-    X_test_scaled = ranking_scaler.transform(X_ranking_test)
-    ranking_y_pred = ranking_model.predict(X_test_scaled)
-    ranking_y_prob = ranking_model.predict_proba(X_test_scaled)[:, 1]
-
+    ranking_model = _fit_ranking_model(X_train_scaled, y_ranking_train)
+    X_ranking_test_scaled = ranking_scaler.transform(X_ranking_test)
+    ranking_y_pred = ranking_model.predict(X_ranking_test_scaled)
+    ranking_y_prob = ranking_model.predict_proba(X_ranking_test_scaled)[:, 1]
     ranking_model_metrics = {
         "ranking_accuracy": accuracy_score(y_ranking_test, ranking_y_pred),
         "ranking_precision": precision_score(y_ranking_test, ranking_y_pred),
@@ -125,8 +123,8 @@ def ml_train_pipeline(model_dir: str | Path | None = None) -> JobMarketModelArti
     )
     salary_scaler, X_train_scaled = scale_features(X_salary_train)
     salary_model = _fit_salary_model(X_train_scaled, y_salary_train)
-    X_test_scaled = salary_scaler.transform(X_salary_test)
-    salary_y_pred = salary_model.predict(X_test_scaled)
+    X_salary_test_scaled = salary_scaler.transform(X_salary_test)
+    salary_y_pred = salary_model.predict(X_salary_test_scaled)
 
     salary_model_metrics = {
         "salary_mae": float(mean_absolute_error(y_salary_test, salary_y_pred)),
@@ -150,6 +148,7 @@ def ml_train_pipeline(model_dir: str | Path | None = None) -> JobMarketModelArti
         ranking_model=ranking_model,
         salary_model=salary_model,
         metrics=metrics,
+        top_skills=find_top_skills()
     )
 
     if model_dir is not None:

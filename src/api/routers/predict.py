@@ -1,29 +1,14 @@
 from fastapi import APIRouter
 
 from src.api.schemas import (
-    PredictInput,
-    PredictionDetails,
-    PredictOutput,
     RecommendationInput,
     RecommendationOutput,
     SalaryPredictionInput,
     SalaryPredictionOutput,
 )
-from src.models.predict_models import predict_market_score, predict_salary_amount, recommend_jobs
+from src.models.predict_models import predict_salary_amount, recommend_jobs
 
 router = APIRouter(prefix="/predict", tags=["Prédictions"])
-
-
-@router.post("", response_model=PredictOutput)
-def predict(payload: PredictInput) -> PredictOutput:
-    score = predict_market_score(payload)
-    return PredictOutput(
-        input=payload,
-        prediction=PredictionDetails(
-            score=score,
-            message="Score calculé avec le modèle ML entraîné sur les offres PostgreSQL.",
-        ),
-    )
 
 
 @router.post("/salary", response_model=SalaryPredictionOutput)

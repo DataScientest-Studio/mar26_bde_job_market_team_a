@@ -7,20 +7,22 @@ entraîné depuis PostgreSQL dans features_preparation.py.
 
 from __future__ import annotations
 
-
 import pandas as pd
+from functools import lru_cache
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 from src.api.schemas import PredictInput, RecommendedJob, RecommendationInput, SalaryPredictionInput
 from src.models.features_preparation import (
     get_features_for_job,
     load_job_market_artifacts,
-    get_model_dir
+    get_model_dir,
+    clean_data
 )
 from src.models.train_models import ml_train_pipeline
 from src.models.utils import retrieve_jobs, encode_user_input
 
-
-
+@lru_cache(maxsize=1)
 def load_model_artifacts():
     """
     Charge les artefacts ML utilisés par l'API.
@@ -46,12 +48,12 @@ def _payload_to_user_input(payload: PredictInput | RecommendationInput | SalaryP
         salary = 0.0
 
     return {
-        "skills": [skill.lower() for skill in payload.skills],
+        "skills": [skill for skill in payload.skills],
         "experience_years": float(payload.experience_years),
-        "salary": float(salary or 0),
+        "expected_salary": float(salary or 0),
         "job_title": getattr(payload, "job_title", None),
         "location": getattr(payload, "location", None),
-        "contract_type": getattr(payload, "contract_type", None),
+        "contract_preference": getattr(payload, "contract_type", None),
         "remote": getattr(payload, "remote", None),
         "education_level": getattr(payload, "education_level", None),
         "industry": getattr(payload, "industry", None),
@@ -84,19 +86,21 @@ def _candidate_jobs(payload: RecommendationInput) -> tuple[dict, pd.DataFrame]:
     user_input = _payload_to_user_input(payload)
     candidate_limit = max(getattr(payload, "limit", 100), 100)
 
-    encoded_user_input = encode_user_input(user_input, artifacts.mlb, artifacts.kmeans_scaler, artifacts.kmeans_model)
-    cluster_id = artifacts.kmeans_model.predict(encoded_user_input)[0]
+    encoded_user_input = encode_user_input(user_input, artifacts.mlbs)
+    kmeans_input = artifacts.kmeans_scaler.transform(encoded_user_input)
+    cluster_id = artifacts.kmeans_model.predict(kmeans_input)[0]
 
     jobs = retrieve_jobs()
+    jobs_cleaned = clean_data(jobs)
     reduced_jobs_ids = artifacts.training_df[artifacts.training_df["cluster"] == cluster_id]["job_id"].to_list()
-    reduced_jobs = jobs[jobs["job_id"].isin(reduced_jobs_ids)]
+    reduced_jobs = jobs_cleaned[jobs_cleaned["job_id"].isin(reduced_jobs_ids)]
 
-    ranked_candidates = _rank_jobs_for_user(artifacts.ranking_model, user_input, reduced_jobs)
+    ranked_candidates = _rank_jobs_for_user(artifacts.ranking_model, user_input, reduced_jobs, artifacts.ranking_scaler)
 
-    return user_input, ranked_candidates.limit(candidate_limit)
+    return user_input, ranked_candidates.head(candidate_limit)
 
 
-def _rank_jobs_for_user(model, user: dict, jobs: pd.DataFrame) -> pd.DataFrame:
+def _rank_jobs_for_user(model: LogisticRegression, user: dict, jobs: pd.DataFrame, scaler: StandardScaler) -> pd.DataFrame:
     rows = []
 
     for _, job in jobs.iterrows():
@@ -118,14 +122,17 @@ def _rank_jobs_for_user(model, user: dict, jobs: pd.DataFrame) -> pd.DataFrame:
     ]
 
     # Probability of match
-    scores = model.predict_proba(df_features[feature_columns])[:, 1]
+    scaled_features = scaler.transform(df_features[feature_columns])
+
+    scores = model.predict_proba(scaled_features)[:, 1]
 
     df_features["relevance_score"] = scores
 
-    return df_features.sort_values(
+    sorted_jobs = df_features.sort_values(
         by="relevance_score",
         ascending=False
     )
+    return sorted_jobs
 
 
 def predict_salary_amount(payload: SalaryPredictionInput) -> float | None:
@@ -133,14 +140,15 @@ def predict_salary_amount(payload: SalaryPredictionInput) -> float | None:
     if artifacts.training_df.empty:
         return None
     user_input = _payload_to_user_input(payload)
-    user_vector = encode_user_input(user_input, artifacts.mlb)[:-1]
-    user_vector_scaled = artifacts.salary_scaler.transform(user_vector)
+    user_df = encode_user_input(user_input, artifacts.mlbs).drop(columns=["salary_bucket"])
+    user_vector_scaled = artifacts.salary_scaler.transform(user_df)
     salary = float(artifacts.salary_model.predict(user_vector_scaled)[0])
     return round(salary, 2)
 
 
 def recommend_jobs(payload: RecommendationInput) -> list[RecommendedJob]:
     _, candidates = _candidate_jobs(payload)
+    jobs = retrieve_jobs()
     if candidates.empty:
         return []
 
@@ -148,10 +156,10 @@ def recommend_jobs(payload: RecommendationInput) -> list[RecommendedJob]:
 
     return [
         RecommendedJob(
-            job_id=str(row["id"]),
-            title=_optional_text(row.get("title")),
-            company=_optional_text(row.get("company")),
+            job_id=str(row["job_id"]),
+            title=_optional_text(row.get("job_title")),
+            company=_optional_text(row.get("company_name")),
             location=_optional_text(row.get("location"))
         )
-        for _, row in ranked_candidates.iterrows()
+        for _, row in jobs[jobs["job_id"].isin(ranked_candidates["job_id"])].iterrows()
     ]
