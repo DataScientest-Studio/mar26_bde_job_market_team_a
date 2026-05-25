@@ -23,6 +23,7 @@ def build_analytics_frames(payload: dict[str, Any]) -> dict[str, pd.DataFrame]:
         ),
         "skill": to_frame(payload, "skill", ["skill_name", "skill_category", "nb_offres"]),
         "advantage": to_frame(payload, "advantage", ["advantage_name", "nb_offres"]),
+        "company": to_frame(payload, "company", ["company_name", "nb_offres"]),
         "source": to_frame(payload, "source", ["source_system", "nb_offres"]),
     }
 

@@ -6,6 +6,7 @@ from src.api.dependencies import DbSession
 from src.api.schemas import (
     AdvantageTrend,
     AnalyticsSummary,
+    CompanyTrend,
     ContractTrend,
     DashboardStats,
     MLModelStats,
@@ -24,6 +25,7 @@ from src.features.dashboard_functions import (
     salary_breakdown_statement,
     salary_by_job_statement,
     top_advantages_statement,
+    top_companies_statement,
     top_skills_statement,
     trends_by_contract_type_statement,
     trends_by_region_statement,
@@ -44,6 +46,7 @@ def get_all_stats(db: DbSession) -> DashboardStats:
             salary=_get_stats_by_salary(db),
             skill=_get_stats_by_skill(db),
             advantage=_get_stats_by_advantage(db),
+            company=_get_stats_by_company(db),
             source=_get_stats_by_source(db),
         )
     except Exception as exc:
@@ -64,9 +67,11 @@ def get_analytics_summary(
     dimension: str | None = Query(None, pattern="^(sector|region|contract_type|job_title|source)$"),
     values: list[str] = Query(default=[]),
     job_titles: list[str] = Query(default=[]),
+    start_year: int | None = Query(None, ge=1900, le=2100),
+    end_year: int | None = Query(None, ge=1900, le=2100),
 ) -> AnalyticsSummary:
     try:
-        rows = db.exec(analytics_summary_statement(dimension, values, job_titles)).all()
+        rows = db.exec(analytics_summary_statement(dimension, values, job_titles, start_year, end_year)).all()
         total_offers = len({row.job_id for row in rows})
 
         sector_counts = Counter(row.sector for row in rows if row.sector and row.sector != "Non renseigné")
@@ -99,13 +104,15 @@ def get_salary_breakdown(
     values: list[str] = Query(default=[]),
     job_titles: list[str] = Query(default=[]),
     limit: int = Query(30, ge=1, le=100),
+    start_year: int | None = Query(None, ge=1900, le=2100),
+    end_year: int | None = Query(None, ge=1900, le=2100),
 ) -> list[SalaryBreakdown]:
     try:
         return [
             SalaryBreakdown(label=row.label, avg_salary=row.avg_salary, nb_offres=row.nb_offres)
             for row in db.exec(
                 salary_breakdown_statement(
-                    group_dimension, filter_dimension, values, job_titles, limit
+                    group_dimension, filter_dimension, values, job_titles, limit, start_year, end_year
                 )
             )
         ]
@@ -121,11 +128,17 @@ def get_offer_breakdown(
     values: list[str] = Query(default=[]),
     job_titles: list[str] = Query(default=[]),
     limit: int = Query(30, ge=1, le=100),
+    start_year: int | None = Query(None, ge=1900, le=2100),
+    end_year: int | None = Query(None, ge=1900, le=2100),
 ) -> list[OfferBreakdown]:
     try:
         return [
             OfferBreakdown(label=row.label, nb_offres=row.nb_offres)
-            for row in db.exec(offers_breakdown_statement(group_dimension, filter_dimension, values, job_titles, limit))
+            for row in db.exec(
+                offers_breakdown_statement(
+                    group_dimension, filter_dimension, values, job_titles, limit, start_year, end_year
+                )
+            )
         ]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -198,6 +211,19 @@ def _get_stats_by_advantage(db: DbSession) -> list[AdvantageTrend]:
                 nb_offres=row.nb_offres,
             )
             for row in db.exec(top_advantages_statement())
+        ]
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def _get_stats_by_company(db: DbSession) -> list[CompanyTrend]:
+    try:
+        return [
+            CompanyTrend(
+                company_name=row.company_name,
+                nb_offres=row.nb_offres,
+            )
+            for row in db.exec(top_companies_statement())
         ]
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

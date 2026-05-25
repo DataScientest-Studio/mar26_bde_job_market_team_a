@@ -28,13 +28,26 @@ from src.dashboard.dataframes import (
 )
 from src.dashboard.ui import compact_currency
 
+ALL_JOBS_LABEL = "Tous les métiers (aucun filtre)"
+JOB_TITLE_KEY = "analytics_job_title"
+
+
+def clear_job_title_filter() -> None:
+    st.session_state[JOB_TITLE_KEY] = ALL_JOBS_LABEL
+
 
 def select_year_range(years: list[int]) -> tuple[int | None, int | None]:
     if not years:
         return None, None
     if len(years) == 1:
         return years[0], years[0]
-    return st.slider("Période", min_value=min(years), max_value=max(years), value=(min(years), max(years)))
+    return st.slider(
+        "Période",
+        min_value=min(years),
+        max_value=max(years),
+        value=(min(years), max(years)),
+        help="Limiter les indicateurs aux offres publiées sur la période sélectionnée",
+    )
 
 
 def render_raw_data(frames: dict[str, pd.DataFrame]) -> None:
@@ -45,6 +58,7 @@ def render_raw_data(frames: dict[str, pd.DataFrame]) -> None:
         "Salaires": frames["salary"],
         "Compétences": frames["skill"],
         "Avantages": frames["advantage"],
+        "Entreprises": frames["company"],
         "Sources": frames["source"],
     }
 
@@ -53,9 +67,14 @@ def render_raw_data(frames: dict[str, pd.DataFrame]) -> None:
             st.dataframe(frame, width="stretch", hide_index=True)
 
 
-def render_signal_cards(skill_df: pd.DataFrame, advantage_df: pd.DataFrame, contract_df: pd.DataFrame) -> None:
+def render_signal_cards(
+    skill_df: pd.DataFrame,
+    advantage_df: pd.DataFrame,
+    contract_df: pd.DataFrame,
+    company_df: pd.DataFrame,
+) -> None:
     st.subheader("Signaux métier")
-    signal_cols = st.columns(3)
+    signal_cols = st.columns(2)
 
     with signal_cols[0].container(border=True):
         skill_display = skill_df.copy()
@@ -64,7 +83,7 @@ def render_signal_cards(skill_df: pd.DataFrame, advantage_df: pd.DataFrame, cont
             skill_display["nb_offres"] = pd.to_numeric(skill_display["nb_offres"], errors="coerce").fillna(0).astype(int)
             st.altair_chart(bar_chart(skill_display.head(12), "label", "nb_offres", "Top compétences"), width="stretch")
         else:
-            st.info("Aucune compétence disponible.")
+            st.info("Aucune compétence disponible")
 
     with signal_cols[1].container(border=True):
         advantage_display = advantage_df.copy()
@@ -75,9 +94,10 @@ def render_signal_cards(skill_df: pd.DataFrame, advantage_df: pd.DataFrame, cont
                 width="stretch",
             )
         else:
-            st.info("Aucun avantage disponible.")
+            st.info("Aucun avantage disponible")
 
-    with signal_cols[2].container(border=True):
+    signal_cols = st.columns(2)
+    with signal_cols[0].container(border=True):
         contract_display = contract_df.copy()
         if not contract_display.empty:
             contract_display["nb_offres"] = pd.to_numeric(contract_display["nb_offres"], errors="coerce").fillna(0).astype(int)
@@ -92,12 +112,23 @@ def render_signal_cards(skill_df: pd.DataFrame, advantage_df: pd.DataFrame, cont
                 width="stretch",
             )
         else:
-            st.info("Aucun contrat disponible.")
+            st.info("Aucun contrat disponible")
+
+    with signal_cols[1].container(border=True):
+        company_display = company_df.copy()
+        if not company_display.empty:
+            company_display["nb_offres"] = pd.to_numeric(company_display["nb_offres"], errors="coerce").fillna(0).astype(int)
+            st.altair_chart(
+                bar_chart(company_display.head(20), "company_name", "nb_offres", "Top entreprises recruteuses"),
+                width="stretch",
+            )
+        else:
+            st.info("Aucune entreprise disponible")
 
 
 def render_analytics_page(api_base_url: str) -> None:
     st.title("Job Market")
-    st.caption("Dashboard analytique alimenté par l'API FastAPI du projet.")
+    st.caption("Dashboard analytique alimenté par l'API FastAPI du projet")
 
     try:
         with st.spinner("Chargement des données marché..."):
@@ -114,6 +145,7 @@ def render_analytics_page(api_base_url: str) -> None:
     salary_df = frames["salary"]
     skill_df = frames["skill"]
     advantage_df = frames["advantage"]
+    company_df = frames["company"]
     source_df = frames["source"]
 
     years = filtered_years(sector_df, region_df, contract_df, salary_df)
@@ -141,13 +173,32 @@ def render_analytics_page(api_base_url: str) -> None:
             for row in job_rows
             if row.get("value")
         }
-        selected_job_title = st.selectbox(
-            "Métier",
-            options=["Tous les métiers"] + job_options,
-            index=0,
-            format_func=lambda value: value if value == "Tous les métiers" else job_labels.get(value, value),
-        )
-        selected_job_titles = [] if selected_job_title == "Tous les métiers" else [selected_job_title]
+        job_select_options = [ALL_JOBS_LABEL] + job_options
+        if st.session_state.get(JOB_TITLE_KEY) not in job_select_options:
+            st.session_state[JOB_TITLE_KEY] = ALL_JOBS_LABEL
+
+        job_select_col, clear_job_col = st.columns([0.82, 0.18])
+        with job_select_col:
+            selected_job_title = st.selectbox(
+                "Métier",
+                options=job_select_options,
+                index=0,
+                key=JOB_TITLE_KEY,
+                format_func=lambda value: value if value == ALL_JOBS_LABEL else job_labels.get(value, value),
+                help="Filtrer les indicateurs sur un métier précis. Garder l'option par défaut pour inclure tous les métiers",
+            )
+        with clear_job_col:
+            st.write("")
+            st.write("")
+            if selected_job_title != ALL_JOBS_LABEL:
+                st.button(
+                    "X",
+                    help="Effacer le métier sélectionné",
+                    on_click=clear_job_title_filter,
+                    width="stretch",
+                )
+
+        selected_job_titles = [] if selected_job_title == ALL_JOBS_LABEL else [selected_job_title]
         selected_jobs_tuple = tuple(selected_job_titles)
 
         st.caption("Filtre 2")
@@ -155,6 +206,7 @@ def render_analytics_page(api_base_url: str) -> None:
             "Analyse par",
             options=["Régions", "Sources", "Secteurs"],
             default="Régions",
+            help="Choisir l'axe utilisé pour les graphiques d'offres et de salaires",
         )
 
         trend_df, label_column, dimension_label, api_dimension = dimension_config[dimension]
@@ -168,6 +220,8 @@ def render_analytics_page(api_base_url: str) -> None:
                     (),
                     selected_jobs_tuple,
                     limit=100,
+                    start_year=start_year,
+                    end_year=end_year,
                 )
                 dimension_options = sorted(
                     [row["label"] for row in dimension_rows if row.get("label")],
@@ -182,11 +236,17 @@ def render_analytics_page(api_base_url: str) -> None:
             f"{dimension_label.capitalize()}s",
             options=dimension_options,
             default=[],
-            placeholder=f"Toutes les valeurs de {dimension_label}",
+            placeholder=f"Toutes les valeurs de {dimension_label} (aucun filtre)",
+            help=f"Limiter l'analyse à une ou plusieurs valeurs de {dimension_label}. Laisser vide pour tout inclure",
         )
+        selected_tuple = tuple(selected_dimension_values)
 
         st.caption(f"API: {api_base_url}")
-        if st.button("Rafraîchir", width="stretch"):
+        if st.button(
+            "Rafraîchir",
+            width="stretch",
+            help="Vider le cache Streamlit et recharger les données depuis l'API",
+        ):
             load_dashboard_stats.clear()
             build_analytics_frames.clear()
             load_job_title_lookup.clear()
@@ -196,16 +256,38 @@ def render_analytics_page(api_base_url: str) -> None:
             st.rerun()
 
     trend_selected = filter_by_labels(trend_filtered, label_column, selected_dimension_values)
-    selected_tuple = tuple(selected_dimension_values)
 
     try:
         with st.spinner("Mise à jour des indicateurs..."):
-            selected_summary = load_analytics_summary(api_base_url, api_dimension, selected_tuple, selected_jobs_tuple)
+            selected_summary = load_analytics_summary(
+                api_base_url,
+                api_dimension,
+                selected_tuple,
+                selected_jobs_tuple,
+                start_year,
+                end_year,
+            )
             offer_breakdown = pd.DataFrame(
-                load_offer_breakdown(api_base_url, api_dimension, api_dimension, selected_tuple, selected_jobs_tuple)
+                load_offer_breakdown(
+                    api_base_url,
+                    api_dimension,
+                    api_dimension,
+                    selected_tuple,
+                    selected_jobs_tuple,
+                    start_year=start_year,
+                    end_year=end_year,
+                )
             )
             salary_breakdown = pd.DataFrame(
-                load_salary_breakdown(api_base_url, api_dimension, api_dimension, selected_tuple, selected_jobs_tuple)
+                load_salary_breakdown(
+                    api_base_url,
+                    api_dimension,
+                    api_dimension,
+                    selected_tuple,
+                    selected_jobs_tuple,
+                    start_year,
+                    end_year,
+                )
             )
     except requests.RequestException:
         selected_summary: dict[str, Any] = {
@@ -236,7 +318,7 @@ def render_analytics_page(api_base_url: str) -> None:
 
         with chart_cols[0].container(border=True):
             if offers_display.empty:
-                st.info("Aucune donnée d'offre disponible pour cette sélection.")
+                st.info("Aucune donnée d'offre disponible pour cette sélection")
             else:
                 st.altair_chart(
                     bar_chart(offers_display, "label", "nb_offres", f"Nombre d'offres par {dimension_label}"),
@@ -245,7 +327,7 @@ def render_analytics_page(api_base_url: str) -> None:
 
         with chart_cols[1].container(border=True):
             if salary_chart_frame.empty:
-                st.info("Aucune donnée de salaire disponible pour cette sélection.")
+                st.info("Aucune donnée de salaire disponible pour cette sélection")
             else:
                 st.altair_chart(
                     salary_bar_chart(
@@ -257,7 +339,7 @@ def render_analytics_page(api_base_url: str) -> None:
                     width="stretch",
                 )
 
-    render_signal_cards(skill_df, advantage_df, contract_df)
+    render_signal_cards(skill_df, advantage_df, contract_df, company_df)
 
     st.subheader("Données API")
     render_raw_data(frames)

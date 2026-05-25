@@ -129,7 +129,6 @@ Pour tester les routes `POST` dans la documentation Swagger et alimenter les
 filtres du dashboard, l'API expose des endpoints de listes de valeurs
 directement issus de PostgreSQL :
 
-- `GET /lookups` : toutes les listes utiles aux formulaires et aux filtres ;
 - `GET /lookups/skills` : compétences disponibles ;
 - `GET /lookups/contracts` : types de contrat ;
 - `GET /lookups/remote` : modalités de télétravail ;
@@ -342,7 +341,8 @@ Il contient deux vues :
   région, source ou secteur, KPI, graphique du nombre d'offres et graphique du
   salaire moyen selon la sélection, puis signaux métier
 - `Prédictions` : pipeline ML, métriques train/test, formulaire dynamique
-  alimenté par `/lookups`, prédiction de salaire et recommandations d'offres
+  alimenté par les endpoints `/lookups/skills`, `/lookups/contracts` et
+  `/lookups/locations`, prédiction de salaire et recommandations d'offres
 
 Exemple `POST /predict/recommendation` :
 

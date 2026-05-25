@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: dashboard_job_offers
+    description: "Table dénormalisée optimisée pour les filtres et les indicateurs du dashboard Streamlit"
+    columns:
+      - name: job_id
+        description: "Identifiant canonique de l'offre"
+        tests: [not_null, unique]
+      - name: published_year
+        description: "Année de publication utilisée pour les tendances temporelles"
+        tests: [not_null]
+      - name: job_title
+        description: "Intitulé du métier affiché dans les filtres du dashboard"
+      - name: sector
+        description: "Secteur d'activité affiché dans les filtres et agrégats du dashboard"
+      - name: region
+        description: "Région normalisée utilisée dans les filtres et agrégats du dashboard"
+      - name: contract_type
+        description: "Type de contrat utilisé dans les filtres et les cartes de synthèse"
+      - name: source_system
+        description: "Source primaire de l'offre canonique"
+      - name: annual_salary
+        description: "Salaire annualisé déjà calculé pour éviter de refaire les conversions côté API"
+      - name: has_salary
+        description: "Indique si l'offre dispose d'un salaire exploitable pour les graphiques"
+
+  - name: agg_dashboard_sector_year
+    description: "Nombre d'offres par secteur et par année"
+
+  - name: agg_dashboard_region_year
+    description: "Nombre d'offres par région et par année"
+
+  - name: agg_dashboard_contract_year
+    description: "Nombre d'offres par type de contrat et par année"
+
+  - name: agg_dashboard_salary_job_year
+    description: "Salaire annuel moyen par métier et par année"
+
+  - name: agg_dashboard_source
+    description: "Nombre d'offres par source"
+
+  - name: agg_dashboard_top_skills
+    description: "Top des compétences précalculé"
+
+  - name: agg_dashboard_top_advantages
+    description: "Top des avantages précalculé"
+
+  - name: agg_dashboard_top_companies
+    description: "Top des entreprises recruteuses précalculé pour les signaux métier du dashboard"
+
+  - name: dashboard_lookup_values
+    description: "Table générique des valeurs de filtres du dashboard, hors métiers, précalculée pour accélérer l'API de lookups."
+    columns:
+      - name: lookup_type
+        description: "Famille du lookup : compétences, contrats, remote, formations, secteurs ou localisations."
+        tests: [not_null]
+      - name: value
+        description: "Valeur technique envoyée à l'API et utilisée par les filtres."
+        tests: [not_null]
+      - name: label
+        description: "Libellé affiché dans Streamlit."
+      - name: nb_offres
+        description: "Nombre d'offres associées à cette valeur."

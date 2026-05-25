@@ -82,7 +82,7 @@ def _optional_float(value) -> float | None:
     return float(value)
 
 
-def _candidate_jobs(payload: RecommendationInput) -> tuple[dict, pd.DataFrame]:
+def _candidate_jobs(payload: RecommendationInput) -> pd.DataFrame:
     artifacts = load_model_artifacts()
     user_input = _payload_to_user_input(payload)
     candidate_limit = max(getattr(payload, "limit", 100), 100)
@@ -98,7 +98,7 @@ def _candidate_jobs(payload: RecommendationInput) -> tuple[dict, pd.DataFrame]:
 
     ranked_candidates = _rank_jobs_for_user(artifacts.ranking_model, user_input, reduced_jobs, artifacts.ranking_scaler)
 
-    return user_input, ranked_candidates.head(candidate_limit)
+    return ranked_candidates.head(candidate_limit)
 
 
 def _rank_jobs_for_user(model: LogisticRegression, user: dict, jobs: pd.DataFrame, scaler: StandardScaler) -> pd.DataFrame:
@@ -147,7 +147,7 @@ def predict_salary_amount(payload: SalaryPredictionInput) -> float | None:
     return round(salary, 2)
 
 def recommend_jobs(payload: RecommendationInput) -> list[RecommendedJob]:
-    _, candidates = _candidate_jobs(payload)
+    candidates = _candidate_jobs(payload)
     jobs = retrieve_jobs()
     if candidates.empty:
         return []

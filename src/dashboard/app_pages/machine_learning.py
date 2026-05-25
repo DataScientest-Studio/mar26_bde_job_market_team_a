@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from src.dashboard.call_api import load_lookups, load_ml_stats, post_api
+from src.dashboard.call_api import load_ml_stats, load_prediction_lookups, post_api
 from src.dashboard.ui import compact_currency, compact_number, lookup_options, metric_value, optional_select
 
 
@@ -15,7 +15,7 @@ def render_ml_page(api_base_url: str) -> None:
     try:
         with st.spinner("Chargement des artefacts ML et des listes de valeurs..."):
             ml_stats = load_ml_stats(api_base_url)
-            lookups = load_lookups(api_base_url)
+            lookups = load_prediction_lookups(api_base_url)
     except requests.RequestException as exc:
         st.error(f"API indisponible: {api_base_url}")
         st.caption(str(exc))

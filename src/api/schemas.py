@@ -51,6 +51,13 @@ class AdvantageTrend(BaseModel):
     nb_offres: int
 
 
+class CompanyTrend(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    company_name: str
+    nb_offres: int
+
+
 class SourceTrend(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -94,6 +101,7 @@ class DashboardStats(BaseModel):
     salary: list[SalaryByJob]
     skill: list[SkillTrend]
     advantage: list[AdvantageTrend]
+    company: list[CompanyTrend]
     source: list[SourceTrend]
 
 
@@ -101,16 +109,6 @@ class LookupValue(BaseModel):
     value: str
     label: str
     count: int | None = None
-
-
-class DashboardLookups(BaseModel):
-    skills: list[LookupValue]
-    contracts: list[LookupValue]
-    remote: list[LookupValue]
-    education: list[LookupValue]
-    industries: list[LookupValue]
-    locations: list[LookupValue]
-    job_titles: list[LookupValue]
 
 
 class CandidateProfileInput(BaseModel):

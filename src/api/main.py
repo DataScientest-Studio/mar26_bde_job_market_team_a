@@ -17,7 +17,6 @@ def read_root() -> dict:
         "endpoints": {
             "predict": ["/predict/salary", "/predict/recommendation"],
             "lookups": [
-                "/lookups",
                 "/lookups/skills",
                 "/lookups/contracts",
                 "/lookups/remote",

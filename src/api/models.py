@@ -134,3 +134,4 @@ class JobOffer(SQLModel, table=True):
     updated_at: datetime | None = None
     match_rule: str | None = None
     match_score: Decimal | None = None
+
