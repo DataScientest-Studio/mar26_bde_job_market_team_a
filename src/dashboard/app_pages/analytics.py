@@ -9,10 +9,11 @@ import streamlit as st
 from src.dashboard.call_api import (
     load_analytics_summary,
     load_dashboard_stats,
+    load_job_title_lookup,
     load_offer_breakdown,
     load_salary_breakdown,
 )
-from src.dashboard.charts import bar_chart, salary_bar_chart, source_donut_chart
+from src.dashboard.charts import bar_chart, salary_bar_chart
 from src.dashboard.dataframes import (
     build_analytics_frames,
     filter_by_labels,
@@ -52,7 +53,7 @@ def render_raw_data(frames: dict[str, pd.DataFrame]) -> None:
             st.dataframe(frame, width="stretch", hide_index=True)
 
 
-def render_signal_cards(skill_df: pd.DataFrame, advantage_df: pd.DataFrame, source_df: pd.DataFrame) -> None:
+def render_signal_cards(skill_df: pd.DataFrame, advantage_df: pd.DataFrame, contract_df: pd.DataFrame) -> None:
     st.subheader("Signaux métier")
     signal_cols = st.columns(3)
 
@@ -77,12 +78,21 @@ def render_signal_cards(skill_df: pd.DataFrame, advantage_df: pd.DataFrame, sour
             st.info("Aucun avantage disponible.")
 
     with signal_cols[2].container(border=True):
-        source_display = source_df.copy()
-        if not source_display.empty:
-            source_display["nb_offres"] = pd.to_numeric(source_display["nb_offres"], errors="coerce").fillna(0).astype(int)
-            st.altair_chart(source_donut_chart(source_display), width="stretch")
+        contract_display = contract_df.copy()
+        if not contract_display.empty:
+            contract_display["nb_offres"] = pd.to_numeric(contract_display["nb_offres"], errors="coerce").fillna(0).astype(int)
+            contract_display = (
+                contract_display.groupby("contract_type", as_index=False)["nb_offres"]
+                .sum()
+                .sort_values("nb_offres", ascending=False)
+                .head(12)
+            )
+            st.altair_chart(
+                bar_chart(contract_display, "contract_type", "nb_offres", "Top contrats"),
+                width="stretch",
+            )
         else:
-            st.info("Aucune source disponible.")
+            st.info("Aucun contrat disponible.")
 
 
 def render_analytics_page(api_base_url: str) -> None:
@@ -124,13 +134,21 @@ def render_analytics_page(api_base_url: str) -> None:
         region_filtered = filter_by_year(region_df, start_year, end_year)
 
         st.caption("Filtre 1")
-        job_options = sorted_label_options(salary_filtered, "job_title", limit=100)
+        job_rows = load_job_title_lookup(api_base_url)
+        job_options = [row["value"] for row in job_rows if row.get("value")]
+        job_labels = {
+            row["value"]: f"{row['label']} ({row.get('count', 0)})"
+            for row in job_rows
+            if row.get("value")
+        }
         selected_job_title = st.selectbox(
             "Métier",
             options=["Tous les métiers"] + job_options,
             index=0,
+            format_func=lambda value: value if value == "Tous les métiers" else job_labels.get(value, value),
         )
         selected_job_titles = [] if selected_job_title == "Tous les métiers" else [selected_job_title]
+        selected_jobs_tuple = tuple(selected_job_titles)
 
         st.caption("Filtre 2")
         dimension = st.pills(
@@ -141,9 +159,28 @@ def render_analytics_page(api_base_url: str) -> None:
 
         trend_df, label_column, dimension_label, api_dimension = dimension_config[dimension]
         trend_filtered = filter_by_year(trend_df, start_year, end_year)
+        if selected_jobs_tuple:
+            try:
+                dimension_rows = load_offer_breakdown(
+                    api_base_url,
+                    api_dimension,
+                    api_dimension,
+                    (),
+                    selected_jobs_tuple,
+                    limit=100,
+                )
+                dimension_options = sorted(
+                    [row["label"] for row in dimension_rows if row.get("label")],
+                    key=lambda value: str(value).casefold(),
+                )
+            except requests.RequestException:
+                dimension_options = sorted_label_options(trend_filtered, label_column, limit=100)
+        else:
+            dimension_options = sorted_label_options(trend_filtered, label_column, limit=100)
+
         selected_dimension_values = st.multiselect(
             f"{dimension_label.capitalize()}s",
-            options=sorted_label_options(trend_filtered, label_column, limit=30),
+            options=dimension_options,
             default=[],
             placeholder=f"Toutes les valeurs de {dimension_label}",
         )
@@ -152,6 +189,7 @@ def render_analytics_page(api_base_url: str) -> None:
         if st.button("Rafraîchir", width="stretch"):
             load_dashboard_stats.clear()
             build_analytics_frames.clear()
+            load_job_title_lookup.clear()
             load_analytics_summary.clear()
             load_offer_breakdown.clear()
             load_salary_breakdown.clear()
@@ -159,7 +197,6 @@ def render_analytics_page(api_base_url: str) -> None:
 
     trend_selected = filter_by_labels(trend_filtered, label_column, selected_dimension_values)
     selected_tuple = tuple(selected_dimension_values)
-    selected_jobs_tuple = tuple(selected_job_titles)
 
     try:
         with st.spinner("Mise à jour des indicateurs..."):
@@ -220,7 +257,7 @@ def render_analytics_page(api_base_url: str) -> None:
                     width="stretch",
                 )
 
-    render_signal_cards(skill_df, advantage_df, source_df)
+    render_signal_cards(skill_df, advantage_df, contract_df)
 
     st.subheader("Données API")
     render_raw_data(frames)

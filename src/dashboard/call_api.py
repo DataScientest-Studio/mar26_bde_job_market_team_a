@@ -30,6 +30,13 @@ def load_lookups(api_base_url: str, limit: int = 200) -> dict[str, Any]:
 
 
 @st.cache_data(show_spinner=False, ttl=300)
+def load_job_title_lookup(api_base_url: str) -> list[dict[str, Any]]:
+    response = requests.get(f"{api_base_url}/lookups/job-titles", timeout=REQUEST_TIMEOUT)
+    response.raise_for_status()
+    return response.json()
+
+
+@st.cache_data(show_spinner=False, ttl=300)
 def load_analytics_summary(
     api_base_url: str,
     dimension: str,
@@ -51,11 +58,12 @@ def load_offer_breakdown(
     filter_dimension: str,
     selected_values: tuple[str, ...],
     selected_job_titles: tuple[str, ...] = (),
+    limit: int = 30,
 ) -> list[dict[str, Any]]:
     params: list[tuple[str, str]] = [
         ("group_dimension", group_dimension),
         ("filter_dimension", filter_dimension),
-        ("limit", "30"),
+        ("limit", str(limit)),
     ]
     params.extend(("values", value) for value in selected_values)
     params.extend(("job_titles", value) for value in selected_job_titles)

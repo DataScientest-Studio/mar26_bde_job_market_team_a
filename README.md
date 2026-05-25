@@ -13,8 +13,8 @@ La base finale doit servir à :
 
 - analyser le marché de l'emploi
 - alimenter un dashboard Streamlit
-- préparer une API de recommandation d'offres
-- préparer une API de prédiction de salaire
+- alimenter une API de recommandation d'offres
+- alimenter une API de prédiction de salaire
 - exposer des tables propres dans Supabase
 
 ## Pipeline
@@ -35,7 +35,7 @@ Le pipeline suit ce flux :
 - transformations : dbt SQL
 - base cible : Supabase PostgreSQL
 - visualisation : Streamlit
-- couche produit à venir : API métier
+- couche produit : API FastAPI
 
 ## Collecte
 
@@ -45,12 +45,15 @@ Le script principal de collecte est :
 
 Les connecteurs sont ici :
 
-- [src/data/connectors/france_travail.py](src/data/connectors/france_travail.py)
-- `src/data/connectors/welcome_to_the_jungle.py`
+- [src/data/connectors/francetravail_requester.py](src/data/connectors/francetravail_requester.py)
+- [src/data/connectors/welcometothejungle_scraper.py](src/data/connectors/welcometothejungle_scraper.py)
 
-Le référentiel de collecte est ici :
+Les référentiels et fichiers de suivi de collecte sont ici :
 
-- [references/collection_targets.yml](references/collection_targets.yml)
+- [references/data_extraction/history.yml](references/data_extraction/history.yml)
+- [references/data_extraction/france_travail/departements_codes.json](references/data_extraction/france_travail/departements_codes.json)
+- [references/data_extraction/france_travail/region_codes.json](references/data_extraction/france_travail/region_codes.json)
+- [references/data_extraction/welcome_to_the_jungle/webscraping_metadata.yml](references/data_extraction/welcome_to_the_jungle/webscraping_metadata.yml)
 
 
 ## Stockage
@@ -105,22 +108,28 @@ Si la date de publication est absente, nous utilisons la date d'ingestion comme 
 
 Deux offres issues de sources différentes peuvent être rapprochées seulement si leurs dates de référence sont dans une fenêtre de 30 jours glissants.
 
+Le `match_score` permet de distinguer le niveau de confiance du rapprochement :
+
+- `1.00` pour un match inter-source exact sur titre, entreprise, ville et fenêtre de dates ;
+- entre `0.70` et `0.95` pour un match fuzzy, quand l'entreprise, la ville et les dates sont compatibles mais que le titre est rapproché par recouvrement de tokens ;
+- `0.50` pour une offre isolée, présente dans une seule source.
+
 Quand deux sources matchent, France Travail reste prioritaire comme source primaire.
 
 ## API Predict
 
 L'API expose des endpoints de prédiction branchés aux modèles ML :
 
-- `POST /predict`
 - `POST /predict/salary`
 - `POST /predict/recommendation`
 
 ## API Lookups
 
-Pour tester les routes `POST` dans la documentation Swagger, l'API expose des
-endpoints de listes de valeurs directement issus de PostgreSQL :
+Pour tester les routes `POST` dans la documentation Swagger et alimenter les
+filtres du dashboard, l'API expose des endpoints de listes de valeurs
+directement issus de PostgreSQL :
 
-- `GET /lookups` : toutes les listes utiles au formulaire de prédiction ;
+- `GET /lookups` : toutes les listes utiles aux formulaires et aux filtres ;
 - `GET /lookups/skills` : compétences disponibles ;
 - `GET /lookups/contracts` : types de contrat ;
 - `GET /lookups/remote` : modalités de télétravail ;
@@ -153,8 +162,8 @@ Le projet contient deux modèles métier :
 - un modèle de recommandation d'offres ;
 - un modèle de prédiction de salaire.
 
-Un modèle de voisins proches est aussi utilisé comme préfiltre technique pour
-limiter le nombre d'offres à scorer.
+Un modèle `KMeans` est aussi utilisé comme préfiltre technique pour regrouper
+les offres similaires et limiter le nombre d'offres à scorer.
 
 ### Données utilisées
 
@@ -162,12 +171,9 @@ Les variables explicatives sont construites depuis les tables marts :
 
 - `analytics.fact_job_offers`
 - `analytics.dim_salary`
-- `analytics.dim_job_type`
 - `analytics.dim_company`
 - `analytics.dim_location`
 - `analytics.dim_contract`
-- `analytics.dim_industry`
-- `analytics.dim_education`
 - `analytics.dim_skill`
 - `analytics.bridge_job_skill`
 
@@ -176,12 +182,8 @@ Les principales variables utilisées sont :
 - compétences de l'offre ;
 - années d'expérience ;
 - salaire annuel moyen ;
-- intitulé du poste ;
 - localisation ;
-- type de contrat ;
-- modalité de télétravail ;
-- secteur ;
-- niveau de formation.
+- type de contrat.
 
 ### Préparation des données
 
@@ -212,10 +214,7 @@ Les variables explicatives sont principalement :
 
 - compétences ;
 - expérience ;
-- intitulé ;
-- localisation ;
-- contrat ;
-- secteur.
+- contrat.
 
 Le modèle utilisé est `KNeighborsRegressor`. Il apprend à estimer un salaire à
 partir des offres déjà présentes en base. L'endpoint `POST /predict/salary`
@@ -264,17 +263,12 @@ Les paramètres envoyés à l'API ne servent pas à entraîner le modèle. Ils s
 - `skills`
 - `experience_years`
 - `expected_salary`
-- `job_title`
 - `location`
 - `contract_type`
-- `remote`
-- `education_level`
-- `industry`
 
 Ces valeurs sont comparées aux offres en base pour calculer des features de
 matching : recouvrement des compétences, écart d'expérience, écart de salaire,
-correspondance du titre, localisation, contrat, télétravail, secteur et
-formation.
+localisation et contrat.
 
 ### Artefacts ML
 
@@ -293,10 +287,10 @@ l'API peut le recréer depuis PostgreSQL en fallback de développement.
 La commande affiche aussi les métriques de test, par exemple :
 
 ```text
-recommendation accuracy
-recommendation precision
-recommendation recall
-recommendation f1
+ranking accuracy
+ranking precision
+ranking recall
+ranking f1
 salary MAE
 salary RMSE
 salary R2
@@ -357,12 +351,8 @@ Exemple `POST /predict/recommendation` :
   "skills": ["python", "sql", "airflow"],
   "experience_years": 3,
   "expected_salary": 45000,
-  "job_title": "data engineer",
   "location": "Paris",
   "contract_type": "CDI",
-  "remote": "teletravail",
-  "education_level": "Bac +5",
-  "industry": "IT / Digital",
   "limit": 10
 }
 ```
@@ -371,14 +361,10 @@ Exemple `POST /predict/salary` :
 
 ```json
 {
-  "job_title": "data engineer",
   "experience_years": 3,
   "skills": ["python", "sql", "dbt"],
   "location": "Paris",
-  "contract_type": "CDI",
-  "remote": "teletravail",
-  "education_level": "Bac +5",
-  "industry": "IT / Digital"
+  "contract_type": "CDI"
 }
 ```
 
@@ -446,7 +432,8 @@ python src\data\normalizers\load_raw_to_postgres.py --source all
 
 Par défaut, le loader charge uniquement les fichiers JSON suffixés par la date du jour
 au format `YYYY-MM-DD`
-et ignore les offres déjà présentes avec le même `raw_hash`.
+et ignore les offres déjà présentes avec le même couple `(source_system, source_offer_id)`.
+Le `raw_hash` est conservé pour tracer le contenu brut collecté.
 
 Pour charger une date précise ou tout l'historique :
 

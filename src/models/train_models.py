@@ -1,3 +1,4 @@
+import argparse
 import os
 import pandas as pd
 from pathlib import Path
@@ -5,7 +6,7 @@ from pathlib import Path
 from sklearn.cluster import KMeans
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    accuracy_score, classification_report, f1_score, f1_score,
+    accuracy_score, classification_report, f1_score,
     mean_absolute_error, precision_score, r2_score, recall_score,
     roc_auc_score, root_mean_squared_error
 )
@@ -18,8 +19,21 @@ from src.models.features_preparation import (
 )
 from src.models.utils import find_top_skills, retrieve_jobs
 
+DEFAULT_ML_N_CLUSTERS_KMEANS = 8
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    return int(value)
+
+
 def _fit_kmeans_model(X_scaled: pd.DataFrame) -> KMeans:
-    kmeans = KMeans(n_clusters=int(os.getenv("ML_N_CLUSTERS_KMEANS")), random_state=42)
+    n_clusters = min(_env_int("ML_N_CLUSTERS_KMEANS", DEFAULT_ML_N_CLUSTERS_KMEANS), len(X_scaled))
+    if n_clusters < 1:
+        raise ValueError("Impossible d'entrainer KMeans sur un dataset vide.")
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     kmeans.fit(X_scaled)
     return kmeans
 
@@ -157,34 +171,20 @@ def ml_train_pipeline(model_dir: str | Path | None = None) -> JobMarketModelArti
     return artifacts
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Train Job Market ML models from PostgreSQL.")
+    parser.add_argument(
+        "--model-dir",
+        default=os.getenv("MODEL_DIR", "models"),
+        help="Directory where the ML artifact pickle is written.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    ml_train_pipeline(model_dir=args.model_dir)
+
+
 if __name__ == "__main__":
-    # def ml_pipeline_lightgbm(engine: Engine) -> LGBMClassifier:
-    #     jobs = retrieve_jobs(engine)
-    #     training_data = generate_training_data(jobs)
-    #     X_train, X_test, y_train, y_test = split_data(training_data)
-
-    #     model = LGBMClassifier(
-    #         n_estimators=300,
-    #         learning_rate=0.05,
-    #         num_leaves=31,
-    #         random_state=42
-    #     )
-
-    #     model.fit(X_train, y_train)
-
-    #     y_pred = model.predict(X_test)
-    #     y_prob = model.predict_proba(X_test)[:, 1]
-
-    #     print("F1:", f1_score(y_test, y_pred))
-    #     print("ROC AUC:", roc_auc_score(y_test, y_prob))
-
-    #     return model
-    # jobs = retrieve_jobs()
-    # kmeans, scaler, mlb, jobs = _fit_kmeans_model(jobs)
-
-    # print(jobs[["id", "cluster"]].head())
-
-    # joblib.dump(kmeans, "kmeans.pkl")
-    # joblib.dump(scaler, "scaler.pkl")
-    # joblib.dump(mlb, "mlb.pkl")
-    pass
+    main()

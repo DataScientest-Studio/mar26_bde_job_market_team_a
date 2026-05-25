@@ -12,7 +12,7 @@ from functools import lru_cache
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-from src.api.schemas import PredictInput, RecommendedJob, RecommendationInput, SalaryPredictionInput
+from src.api.schemas import RecommendedJob, RecommendationInput, SalaryPredictionInput
 from src.models.features_preparation import (
     get_features_for_job,
     load_job_market_artifacts,
@@ -41,7 +41,7 @@ def load_model_artifacts():
         return ml_train_pipeline(model_dir=get_model_dir())
 
 
-def _payload_to_user_input(payload: PredictInput | RecommendationInput | SalaryPredictionInput) -> dict:
+def _payload_to_user_input(payload: RecommendationInput | SalaryPredictionInput) -> dict:
     salary = getattr(payload, "expected_salary", None)
     if salary is None:
         # TODO : use average salary 
@@ -51,12 +51,8 @@ def _payload_to_user_input(payload: PredictInput | RecommendationInput | SalaryP
         "skills": [skill for skill in payload.skills],
         "experience_years": float(payload.experience_years),
         "expected_salary": float(salary or 0),
-        "job_title": getattr(payload, "job_title", None),
-        "location": getattr(payload, "location", None),
+        "location": getattr(payload, "location", None) or "",
         "contract_preference": getattr(payload, "contract_type", None),
-        "remote": getattr(payload, "remote", None),
-        "education_level": getattr(payload, "education_level", None),
-        "industry": getattr(payload, "industry", None),
     }
 
 
@@ -78,6 +74,12 @@ def _optional_text(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _optional_float(value) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    return float(value)
 
 
 def _candidate_jobs(payload: RecommendationInput) -> tuple[dict, pd.DataFrame]:
@@ -158,7 +160,7 @@ def recommend_jobs(payload: RecommendationInput) -> list[RecommendedJob]:
             title=_optional_text(row.get("job_title")),
             company=_optional_text(row.get("company_name")),
             location=_optional_text(row.get("location")),
-            salary=_optional_text(row.get("salary"))
+            salary=_optional_float(row.get("salary")),
         )
         for _, row in jobs[jobs["job_id"].isin(ranked_candidates["job_id"])].iterrows()
     ]

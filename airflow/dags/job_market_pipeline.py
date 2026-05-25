@@ -86,12 +86,12 @@ with DAG(
     should_run_dbt = ShortCircuitOperator(
         task_id="should_run_dbt",
         python_callable=has_loaded_rows,
+        trigger_rule=TriggerRule.ALL_DONE,
     )
 
     dbt_run = BashOperator(
         task_id="dbt_run",
         bash_command=pipeline_command("python scripts/run_dbt.py run"),
-        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
     )
 
     dbt_test = BashOperator(

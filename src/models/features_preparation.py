@@ -89,6 +89,17 @@ from src.models.utils import (
 )
 
 
+DEFAULT_MODEL_ARTIFACTS_FILENAME = "job_market_model_artifacts.pkl"
+DEFAULT_LABEL_THRESHOLD = 0.6
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    return float(value)
+
+
 @dataclass
 class JobMarketModelArtifacts:
     """
@@ -129,7 +140,7 @@ def get_model_dir(model_dir: str | Path | None = None) -> Path:
 
 
 def get_model_artifacts_path(model_dir: str | Path | None = None) -> Path:
-    return get_model_dir(model_dir) / os.getenv("MODEL_ARTIFACTS_FILENAME")
+    return get_model_dir(model_dir) / os.getenv("MODEL_ARTIFACTS_FILENAME", DEFAULT_MODEL_ARTIFACTS_FILENAME)
 
 
 def save_job_market_artifacts(artifacts: JobMarketModelArtifacts, model_dir: str | Path | None = None) -> Path:
@@ -143,7 +154,7 @@ def save_job_market_artifacts(artifacts: JobMarketModelArtifacts, model_dir: str
     model_path.mkdir(parents=True, exist_ok=True)
 
     # TODO Add versionining to artifacts and filename for better tracking of model versions
-    artifacts_path = model_path / os.getenv("MODEL_ARTIFACTS_FILENAME")
+    artifacts_path = model_path / os.getenv("MODEL_ARTIFACTS_FILENAME", DEFAULT_MODEL_ARTIFACTS_FILENAME)
     joblib.dump(artifacts, artifacts_path)
     return artifacts_path
 
@@ -256,7 +267,7 @@ def get_features_for_job(job: pd.Series, user: dict) -> dict:
     }
 
 def generate_training_data(jobs: pd.DataFrame) -> pd.DataFrame:
-    threshold = float(os.getenv("LABEL_THRESHOLD"))
+    threshold = _env_float("LABEL_THRESHOLD", DEFAULT_LABEL_THRESHOLD)
     training_rows = []
 
     for _, job in jobs.iterrows():

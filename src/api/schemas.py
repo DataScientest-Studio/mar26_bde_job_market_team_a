@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -63,7 +65,7 @@ class MLModelStats(BaseModel):
     ranking_model: str
     salary_model: str
     candidate_prefilter: str
-    metrics: dict[str, dict[str, float | str | dict]]
+    metrics: dict[str, dict[str, Any]]
 
 
 class AnalyticsSummary(BaseModel):
@@ -116,59 +118,28 @@ class CandidateProfileInput(BaseModel):
         default_factory=list,
         description="Compétences du candidat. Valeurs disponibles via GET /lookups/skills.",
     )
-    experience_years: int = Field(ge=0, description="Nombre d'années d'expérience.")
+    experience_years: float = Field(ge=0, description="Nombre d'années d'expérience.")
     expected_salary: float | None = Field(default=None, ge=0, description="Salaire annuel attendu en euros.")
-    location: str | None = Field(default=None, description="Localisation souhaitee. Valeurs via GET /lookups/locations.")
+    location: str | None = Field(default=None, description="Localisation souhaitée. Valeurs via GET /lookups/locations.")
     contract_type: str | None = Field(default=None, description="Type de contrat. Valeurs via GET /lookups/contracts.")
-    remote: str | None = Field(default=None, description="Préférence télétravail. Valeurs via GET /lookups/remote.")
-    education_level: str | None = Field(default=None, description="Niveau de formation. Valeurs via GET /lookups/education.")
-    industry: str | None = Field(default=None, description="Secteur cible. Valeurs via GET /lookups/industries.")
-
-
-class PredictInput(CandidateProfileInput):
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "skills": ["faire preuve d'autonomie", "travailler en équipe"],
-                "experience_years": 2,
-                "expected_salary": 28000,
-                "job_title": "Aide-soignant / Aide-soignante",
-                "location": "CAEN, normandie",
-                "contract_type": "CDI",
-                "remote": "Non précisé",
-                "education_level": "Bac",
-                "industry": "Santé",
-            }
-        }
-    )
-
-    job_title: str | None = Field(default=None, description="Intitulé de poste cible. Valeurs via GET /lookups/job-titles.")
 
 
 class SalaryPredictionInput(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "job_title": "Aide-soignant / Aide-soignante",
                 "experience_years": 2,
                 "skills": ["faire preuve d'autonomie", "travailler en équipe"],
                 "location": "CAEN, normandie",
                 "contract_type": "CDI",
-                "remote": "Non précisé",
-                "education_level": "Bac",
-                "industry": "Santé",
             }
         }
     )
 
-    job_title: str = Field(description="Intitulé du poste. Valeurs via GET /lookups/job-titles.")
     experience_years: float = Field(ge=0, description="Nombre d'années d'expérience.")
     skills: list[str] = Field(default_factory=list, description="Compétences utiles. Valeurs via GET /lookups/skills.")
     location: str | None = Field(default=None, description="Localisation du poste. Valeurs via GET /lookups/locations.")
     contract_type: str | None = Field(default=None, description="Type de contrat. Valeurs via GET /lookups/contracts.")
-    remote: str | None = Field(default=None, description="Modalité télétravail. Valeurs via GET /lookups/remote.")
-    education_level: str | None = Field(default=None, description="Niveau de formation. Valeurs via GET /lookups/education.")
-    industry: str | None = Field(default=None, description="Secteur d'activité. Valeurs via GET /lookups/industries.")
 
 
 class RecommendationInput(CandidateProfileInput):
@@ -178,32 +149,17 @@ class RecommendationInput(CandidateProfileInput):
                 "skills": ["faire preuve d'autonomie", "travailler en équipe"],
                 "experience_years": 2,
                 "expected_salary": 28000,
-                "job_title": "Aide-soignant / Aide-soignante",
                 "location": "CAEN, normandie",
                 "contract_type": "CDI",
-                "remote": "Non précisé",
-                "education_level": "Bac",
-                "industry": "Santé",
                 "limit": 10,
             }
         }
     )
 
-    job_title: str | None = Field(default=None, description="Intitulé de poste recherché. Valeurs via GET /lookups/job-titles.")
     limit: int = Field(default=10, ge=1, le=50, description="Nombre maximum de recommandations.")
 
     def __hash__(self):
         return hash((self.location, self.experience_years, self.expected_salary, tuple(self.skills), self.contract_type))
-
-
-class PredictionDetails(BaseModel):
-    score: float | None = None
-    message: str
-
-
-class PredictOutput(BaseModel):
-    input: PredictInput
-    prediction: PredictionDetails
 
 
 class SalaryPredictionOutput(BaseModel):

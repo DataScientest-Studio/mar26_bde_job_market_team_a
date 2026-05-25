@@ -31,8 +31,8 @@ def _not_blank(column: Any):
     return func.nullif(column, "").is_not(None)
 
 
-def _lookup_statement(value_expr: Any, label_expr: Any, count_expr: Any, limit: int) -> Select:
-    return (
+def _lookup_statement(value_expr: Any, label_expr: Any, count_expr: Any, limit: int | None) -> Select:
+    statement = (
         select(
             value_expr.label("value"),
             label_expr.label("label"),
@@ -41,8 +41,10 @@ def _lookup_statement(value_expr: Any, label_expr: Any, count_expr: Any, limit: 
         .where(_not_blank(value_expr))
         .group_by(value_expr, label_expr)
         .order_by(count_expr.desc().nulls_last(), label_expr)
-        .limit(limit)
     )
+    if limit is not None:
+        statement = statement.limit(limit)
+    return statement
 
 
 def _fetch_lookup(db: DbSession, statement: Select) -> list[LookupValue]:
@@ -127,12 +129,18 @@ def get_location_values(db: DbSession, limit: int = Query(100, ge=1, le=500)) ->
 
 
 @router.get("/job-titles", response_model=list[LookupValue])
-def get_job_title_values(db: DbSession, limit: int = Query(100, ge=1, le=500)) -> list[LookupValue]:
+def get_job_title_values(
+    db: DbSession,
+    limit: int | None = Query(default=None, ge=1),
+    search: str | None = Query(default=None, min_length=1),
+) -> list[LookupValue]:
     count_expr = _count_jobs()
     statement = (
         _lookup_statement(JobType.title, JobType.title, count_expr, limit)
         .join(JobOffer, JobType.job_type_id == JobOffer.job_type_id)
     )
+    if search:
+        statement = statement.where(JobType.title.ilike(f"%{search.strip()}%"))
     return _fetch_lookup(db, statement)
 
 
