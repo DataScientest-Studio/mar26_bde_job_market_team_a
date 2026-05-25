@@ -170,7 +170,7 @@ def render_ml_page(api_base_url: str) -> None:
                 else:
                     st.dataframe(recommendations, width='stretch', hide_index=True)
             else:
-                st.subheader("Salaire prédit")
+                st.subheader("Salaire prédit", text_alignment='center')
                 st.metric("Salaire annuel", compact_currency(predict_result.get("predicted_salary")))
 
     with st.expander("Payload envoyé à l'API"):
