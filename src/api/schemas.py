@@ -59,12 +59,11 @@ class SourceTrend(BaseModel):
 class MLModelStats(BaseModel):
     training_rows: int
     encoded_skills: int
-    recommendation_features: int
-    salary_features: int
-    recommendation_model: str
+    encoded_contracts: int
+    ranking_model: str
     salary_model: str
     candidate_prefilter: str
-    metrics: dict[str, float]
+    metrics: dict[str, dict[str, float | str | dict]]
 
 
 class AnalyticsSummary(BaseModel):
@@ -193,6 +192,9 @@ class RecommendationInput(CandidateProfileInput):
     job_title: str | None = Field(default=None, description="Intitulé de poste recherché. Valeurs via GET /lookups/job-titles.")
     limit: int = Field(default=10, ge=1, le=50, description="Nombre maximum de recommandations.")
 
+    def __hash__(self):
+        return hash((self.location, self.experience_years, self.expected_salary, tuple(self.skills), self.contract_type))
+
 
 class PredictionDetails(BaseModel):
     score: float | None = None
@@ -215,6 +217,7 @@ class RecommendedJob(BaseModel):
     title: str | None = None
     company: str | None = None
     location: str | None = None
+    salary: float | None = None
 
 
 class RecommendationOutput(BaseModel):
