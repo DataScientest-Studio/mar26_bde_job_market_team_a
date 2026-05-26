@@ -23,8 +23,19 @@ def load_ml_stats(api_base_url: str) -> dict[str, Any]:
 
 
 @st.cache_data(show_spinner=False, ttl=300)
-def load_lookups(api_base_url: str, limit: int = 200) -> dict[str, Any]:
-    response = requests.get(f"{api_base_url}/lookups", params={"limit": limit}, timeout=REQUEST_TIMEOUT)
+def load_prediction_lookups(api_base_url: str, limit: int = 200) -> dict[str, Any]:
+    lookup_keys = ("skills", "contracts", "locations")
+    lookups: dict[str, Any] = {}
+    for key in lookup_keys:
+        response = requests.get(f"{api_base_url}/lookups/{key}", params={"limit": limit}, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        lookups[key] = response.json()
+    return lookups
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def load_job_title_lookup(api_base_url: str) -> list[dict[str, Any]]:
+    response = requests.get(f"{api_base_url}/lookups/job-titles", timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
 
@@ -35,10 +46,16 @@ def load_analytics_summary(
     dimension: str,
     selected_values: tuple[str, ...],
     selected_job_titles: tuple[str, ...] = (),
+    start_year: int | None = None,
+    end_year: int | None = None,
 ) -> dict[str, Any]:
     params: list[tuple[str, str]] = [("dimension", dimension)]
     params.extend(("values", value) for value in selected_values)
     params.extend(("job_titles", value) for value in selected_job_titles)
+    if start_year is not None:
+        params.append(("start_year", str(start_year)))
+    if end_year is not None:
+        params.append(("end_year", str(end_year)))
     response = requests.get(f"{api_base_url}/stats/summary", params=params, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
@@ -51,14 +68,21 @@ def load_offer_breakdown(
     filter_dimension: str,
     selected_values: tuple[str, ...],
     selected_job_titles: tuple[str, ...] = (),
+    limit: int = 30,
+    start_year: int | None = None,
+    end_year: int | None = None,
 ) -> list[dict[str, Any]]:
     params: list[tuple[str, str]] = [
         ("group_dimension", group_dimension),
         ("filter_dimension", filter_dimension),
-        ("limit", "30"),
+        ("limit", str(limit)),
     ]
     params.extend(("values", value) for value in selected_values)
     params.extend(("job_titles", value) for value in selected_job_titles)
+    if start_year is not None:
+        params.append(("start_year", str(start_year)))
+    if end_year is not None:
+        params.append(("end_year", str(end_year)))
     response = requests.get(f"{api_base_url}/stats/breakdown", params=params, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
@@ -71,6 +95,8 @@ def load_salary_breakdown(
     filter_dimension: str,
     selected_values: tuple[str, ...],
     selected_job_titles: tuple[str, ...] = (),
+    start_year: int | None = None,
+    end_year: int | None = None,
 ) -> list[dict[str, Any]]:
     params: list[tuple[str, str]] = [
         ("group_dimension", group_dimension),
@@ -79,6 +105,10 @@ def load_salary_breakdown(
     ]
     params.extend(("values", value) for value in selected_values)
     params.extend(("job_titles", value) for value in selected_job_titles)
+    if start_year is not None:
+        params.append(("start_year", str(start_year)))
+    if end_year is not None:
+        params.append(("end_year", str(end_year)))
     response = requests.get(f"{api_base_url}/stats/salary_breakdown", params=params, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()

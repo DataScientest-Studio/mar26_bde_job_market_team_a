@@ -146,7 +146,6 @@ def gather_data_from_api(target_regions_lst, target_departements_lst, access_tok
                         nb_days = get_publiee_depuis_arg_nb(latest_ft)
                         publiee_depuis_arg = f"&publieeDepuis={nb_days}"
                         search_url = search_url+publiee_depuis_arg
-                        print(f"Publiées depuis {publiee_depuis_arg}")
 
                     # Lancement de la requête
                     data = call_protected_api(search_url, access_token)

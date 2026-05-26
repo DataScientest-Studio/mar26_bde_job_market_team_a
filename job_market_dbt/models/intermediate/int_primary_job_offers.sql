@@ -21,7 +21,7 @@ with attributes as (
 salary_matches as (
     select
         *,
-        salary_text ~ '(^|[^a-z0-9])k([^a-z0-9]|$)|\bk\s*(eur|euros)\b' as salary_has_k,
+        salary_text ~ '[0-9]\s*k([^a-z0-9]|$)|\bk\s*(eur|euros)\b' as salary_has_k,
         regexp_match(
             salary_text,
             '([0-9]+(?:\s?[0-9]{3})*(?:[,.][0-9]+)?)\s*(?:k|eur|euros)?[^0-9,.]+([0-9]+(?:\s?[0-9]{3})*(?:[,.][0-9]+)?)\s*(?:k|eur|euros)'

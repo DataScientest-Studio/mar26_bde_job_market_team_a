@@ -15,9 +15,8 @@ def read_root() -> dict:
         "message": "Job Market API",
         "docs": "/docs",
         "endpoints": {
-            "predict": ["/predict", "/predict/salary", "/predict/recommendation"],
+            "predict": ["/predict/salary", "/predict/recommendation"],
             "lookups": [
-                "/lookups",
                 "/lookups/skills",
                 "/lookups/contracts",
                 "/lookups/remote",

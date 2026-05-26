@@ -8,6 +8,16 @@ from sqlmodel import case, select
 from src.api.models import Company, Contract, JobOffer, JobType, Location, Salary, JobSkill, Skill
 from src.database import get_engine
 
+DEFAULT_ML_SKILL_LIMIT = 100
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value in (None, ""):
+        return default
+    return int(value)
+
+
 def encode_experience(years: float) -> int:
     """
     Transforme une variable quantitative en variable ordinale.
@@ -73,7 +83,7 @@ def find_top_skills() -> list[str]:
         .where(func.nullif(Skill.skill_name, "").is_not(None))
         .group_by(Skill.skill_name)
         .order_by(skill_count.desc(), Skill.skill_name)
-        .limit(os.getenv('ML_SKILL_LIMIT'))
+        .limit(_env_int("ML_SKILL_LIMIT", DEFAULT_ML_SKILL_LIMIT))
     )
 
     # Execute query and load data into DataFrame

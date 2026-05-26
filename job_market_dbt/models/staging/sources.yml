@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: landing
-    description: "Tables raw chargees depuis les JSON locaux dans PostgreSQL."
+    description: "Tables raw chargées depuis les JSON locaux dans PostgreSQL."
     schema: landing
     tables:
       - name: raw_france_travail_offers

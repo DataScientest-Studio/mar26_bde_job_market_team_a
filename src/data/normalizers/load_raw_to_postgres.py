@@ -28,6 +28,7 @@ FRANCE_TRAVAIL_URL = "https://candidat.francetravail.fr/offres/recherche/detail/
 FRANCE_TRAVAIL_SOURCE_DIR = "france_travail"
 WELCOME_TO_THE_JUNGLE_SOURCE_DIR = "welcome_to_the_jungle"
 RAW_FILE_DATE_FORMAT = "%Y-%m-%d"
+INSERT_BATCH_SIZE = 5000
 
 
 def build_raw_hash(payload: dict) -> str:
@@ -247,12 +248,16 @@ def insert_records(
         return 0, 0
 
     table = landing_table(table_name)
-    statement = insert(table).values(records).on_conflict_do_nothing(
-        index_elements=["source_system", "source_offer_id"],
-        index_where=table.c.source_offer_id.is_not(None),
-    ).returning(table.c.raw_hash)
-    result = conn.execute(statement)
-    inserted = len(result.all())
+    inserted = 0
+
+    for start in range(0, len(records), INSERT_BATCH_SIZE):
+        batch = records[start : start + INSERT_BATCH_SIZE]
+        statement = insert(table).values(batch).on_conflict_do_nothing(
+            index_elements=["source_system", "source_offer_id"],
+            index_where=table.c.source_offer_id.is_not(None),
+        ).returning(table.c.raw_hash)
+        result = conn.execute(statement)
+        inserted += len(result.all())
 
     return inserted, len(records) - inserted
 
@@ -284,7 +289,7 @@ def load_france_travail(
         total_skipped += skipped
         print(
             f"[france_travail] {file_path.name}: "
-            f"{inserted} offres chargees, {skipped} doublons ignores"
+            f"{inserted} offres chargées, {skipped} doublons ignorés"
         )
 
     return total_inserted, total_skipped, files
@@ -316,7 +321,7 @@ def load_welcome_to_the_jungle(
         total_skipped += skipped
         print(
             f"[welcome_to_the_jungle] {file_path.name}: "
-            f"{inserted} offres chargees, {skipped} doublons ignores"
+            f"{inserted} offres chargées, {skipped} doublons ignorés"
         )
 
     return total_inserted, total_skipped, files

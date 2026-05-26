@@ -1,120 +1,73 @@
 """
-Dashboard functions for job market data analytics.
-Builds SQLModel/SQLAlchemy statements executed by the API layer.
-
-Planned analytics:
-- tendances par secteur => statistiques généraux
-- tendances par région
-- tendances par type de contrat
-- salaires par métier
-- quelles recos on fait (ML):
-    par critère on recommande telle ou telle offre à un utilisateur
-    prédiction salaires
-    prédiction du marché de l'emploi de l'individu
-    compétences de l'utilisateur => recommandation sur quels métiers correspondent le mieux
+Dashboard query builders.
 """
 
-from sqlalchemy import Integer, case, desc, func
+from sqlalchemy import case, desc, func
 from sqlalchemy.sql import Select
 from sqlmodel import select
 
-from src.api.models import Advantage, Contract, Industry, JobAdvantage, JobOffer, JobSkill, JobType, Location, Salary, Skill
+from src.api.dashboard_models import (
+    AggDashboardContractYear,
+    AggDashboardRegionYear,
+    AggDashboardSalaryJobYear,
+    AggDashboardSectorYear,
+    AggDashboardSource,
+    AggDashboardTopAdvantage,
+    AggDashboardTopCompany,
+    AggDashboardTopSkill,
+    DashboardJobOffer,
+    DashboardLookupValue,
+)
 
 MIN_DASHBOARD_ANNUAL_SALARY = 10_000
 MAX_DASHBOARD_ANNUAL_SALARY = 200_000
+MISSING_LABEL = "NON RENSEIGNÉ"
 
 
 def trends_by_sector_statement() -> Select:
-    sector = func.coalesce(Industry.industry_name, "Non renseigné").label("sector")
-    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
-    nb_offres = func.count().cast(Integer).label("nb_offres")
-
-    return (
-        select(sector, year, nb_offres)
-        .join(Industry, JobOffer.industry_id == Industry.industry_id)
-        .where(JobOffer.published_at.is_not(None))
-        .group_by(sector, year)
-        .order_by(desc(nb_offres))
-    )
+    return select(
+        AggDashboardSectorYear.sector,
+        AggDashboardSectorYear.year,
+        AggDashboardSectorYear.nb_offres,
+    ).order_by(desc(AggDashboardSectorYear.nb_offres))
 
 
 def trends_by_region_statement() -> Select:
-    region = func.coalesce(Location.region, "Non renseigné").label("region")
-    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
-    nb_offres = func.count().cast(Integer).label("nb_offres")
-
-    return (
-        select(region, year, nb_offres)
-        .join(Location, JobOffer.location_id == Location.location_id)
-        .where(JobOffer.published_at.is_not(None))
-        .where(func.nullif(Location.region, "").is_not(None))
-        .group_by(region, year)
-        .order_by(desc(nb_offres))
-    )
+    return select(
+        AggDashboardRegionYear.region,
+        AggDashboardRegionYear.year,
+        AggDashboardRegionYear.nb_offres,
+    ).order_by(desc(AggDashboardRegionYear.nb_offres))
 
 
 def trends_by_contract_type_statement() -> Select:
-    contract_type = func.coalesce(Contract.contract_type, "Non renseigné").label("contract_type")
-    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
-    nb_offres = func.count().cast(Integer).label("nb_offres")
-
-    return (
-        select(contract_type, year, nb_offres)
-        .join(Contract, JobOffer.contract_type_id == Contract.contract_type_id)
-        .where(JobOffer.published_at.is_not(None))
-        .group_by(contract_type, year)
-        .order_by(desc(nb_offres))
-    )
+    return select(
+        AggDashboardContractYear.contract_type,
+        AggDashboardContractYear.year,
+        AggDashboardContractYear.nb_offres,
+    ).order_by(desc(AggDashboardContractYear.nb_offres))
 
 
 def salary_by_job_statement() -> Select:
-    job_title = func.coalesce(JobType.title, "Non renseigné").label("job_title")
-    year = func.extract("year", JobOffer.published_at).cast(Integer).label("year")
-    salary_amount = (
-        (func.coalesce(Salary.salary_min, Salary.salary_max) + func.coalesce(Salary.salary_max, Salary.salary_min)) / 2
-    )
-    annual_salary_amount = (
-        case(
-            (Salary.frequency == "month", salary_amount * 12),
-            (Salary.frequency == "week", salary_amount * 52),
-            (Salary.frequency == "hour", salary_amount * 35 * 52),
-            else_=salary_amount,
-        )
-    )
-    avg_salary = func.round(func.avg(annual_salary_amount), 2).label("avg_salary")
-    nb_offres = func.count().cast(Integer).label("nb_offres")
-
-    return (
-        select(job_title, year, avg_salary, nb_offres)
-        .join(JobType, JobOffer.job_type_id == JobType.job_type_id)
-        .join(Salary, JobOffer.salary_id == Salary.salary_id)
-        .where((Salary.salary_min.is_not(None) | Salary.salary_max.is_not(None)))
-        .where(annual_salary_amount.between(MIN_DASHBOARD_ANNUAL_SALARY, MAX_DASHBOARD_ANNUAL_SALARY))
-        .where(JobOffer.published_at.is_not(None))
-        .group_by(job_title, year)
-        .order_by(desc(avg_salary))
-    )
+    return select(
+        AggDashboardSalaryJobYear.job_title,
+        AggDashboardSalaryJobYear.year,
+        AggDashboardSalaryJobYear.avg_salary,
+        AggDashboardSalaryJobYear.nb_offres,
+    ).order_by(desc(AggDashboardSalaryJobYear.avg_salary))
 
 
 def annual_salary_expression():
-    salary_amount = (
-        (func.coalesce(Salary.salary_min, Salary.salary_max) + func.coalesce(Salary.salary_max, Salary.salary_min)) / 2
-    )
-    return case(
-        (Salary.frequency == "month", salary_amount * 12),
-        (Salary.frequency == "week", salary_amount * 52),
-        (Salary.frequency == "hour", salary_amount * 35 * 52),
-        else_=salary_amount,
-    )
+    return DashboardJobOffer.annual_salary
 
 
 def dimension_columns() -> dict[str, object]:
     return {
-        "sector": Industry.industry_name,
-        "region": Location.region,
-        "contract_type": Contract.contract_type,
-        "job_title": JobType.title,
-        "source": JobOffer.primary_source_system,
+        "sector": DashboardJobOffer.sector,
+        "region": DashboardJobOffer.region,
+        "contract_type": DashboardJobOffer.contract_type,
+        "job_title": DashboardJobOffer.job_title,
+        "source": DashboardJobOffer.source_system,
     }
 
 
@@ -122,26 +75,15 @@ def analytics_summary_statement(
     dimension: str | None = None,
     values: list[str] | None = None,
     job_titles: list[str] | None = None,
+    start_year: int | None = None,
+    end_year: int | None = None,
 ) -> Select:
-    sector = func.coalesce(Industry.industry_name, "Non renseigné").label("sector")
-    region = func.coalesce(Location.region, "Non renseigné").label("region")
-    contract_type = func.coalesce(Contract.contract_type, "Non renseigné").label("contract_type")
-    annual_salary = annual_salary_expression().label("annual_salary")
-
-    statement = (
-        select(
-            JobOffer.job_id,
-            sector,
-            region,
-            contract_type,
-            annual_salary,
-        )
-        .outerjoin(Industry, JobOffer.industry_id == Industry.industry_id)
-        .outerjoin(Location, JobOffer.location_id == Location.location_id)
-        .outerjoin(Contract, JobOffer.contract_type_id == Contract.contract_type_id)
-        .outerjoin(JobType, JobOffer.job_type_id == JobType.job_type_id)
-        .outerjoin(Salary, JobOffer.salary_id == Salary.salary_id)
-        .where(JobOffer.published_at.is_not(None))
+    statement = select(
+        DashboardJobOffer.job_id,
+        DashboardJobOffer.sector,
+        DashboardJobOffer.region,
+        DashboardJobOffer.contract_type,
+        DashboardJobOffer.annual_salary,
     )
 
     if values:
@@ -150,7 +92,12 @@ def analytics_summary_statement(
             statement = statement.where(filter_column.in_(values))
 
     if job_titles:
-        statement = statement.where(JobType.title.in_(job_titles))
+        statement = statement.where(DashboardJobOffer.job_title.in_(job_titles))
+
+    if start_year is not None:
+        statement = statement.where(DashboardJobOffer.published_year >= start_year)
+    if end_year is not None:
+        statement = statement.where(DashboardJobOffer.published_year <= end_year)
 
     return statement
 
@@ -161,21 +108,15 @@ def offers_breakdown_statement(
     filter_values: list[str] | None = None,
     job_titles: list[str] | None = None,
     limit: int = 30,
+    start_year: int | None = None,
+    end_year: int | None = None,
 ) -> Select:
     dimension_map = dimension_columns()
-    group_column = dimension_map.get(group_dimension, Location.region)
-    label = func.coalesce(group_column, "Non renseigné").label("label")
-    nb_offres = func.count(func.distinct(JobOffer.job_id)).cast(Integer).label("nb_offres")
+    group_column = dimension_map.get(group_dimension, DashboardJobOffer.region)
+    label = func.coalesce(group_column, MISSING_LABEL).label("label")
+    nb_offres = func.count(func.distinct(DashboardJobOffer.job_id)).label("nb_offres")
 
-    statement = (
-        select(label, nb_offres)
-        .outerjoin(Industry, JobOffer.industry_id == Industry.industry_id)
-        .outerjoin(Location, JobOffer.location_id == Location.location_id)
-        .outerjoin(Contract, JobOffer.contract_type_id == Contract.contract_type_id)
-        .outerjoin(JobType, JobOffer.job_type_id == JobType.job_type_id)
-        .where(JobOffer.published_at.is_not(None))
-        .where(func.nullif(group_column, "").is_not(None))
-    )
+    statement = select(label, nb_offres).where(func.nullif(group_column, "").is_not(None))
 
     if filter_values:
         filter_column = dimension_map.get(filter_dimension or "")
@@ -183,13 +124,14 @@ def offers_breakdown_statement(
             statement = statement.where(filter_column.in_(filter_values))
 
     if job_titles:
-        statement = statement.where(JobType.title.in_(job_titles))
+        statement = statement.where(DashboardJobOffer.job_title.in_(job_titles))
 
-    return (
-        statement.group_by(label)
-        .order_by(desc(nb_offres))
-        .limit(limit)
-    )
+    if start_year is not None:
+        statement = statement.where(DashboardJobOffer.published_year >= start_year)
+    if end_year is not None:
+        statement = statement.where(DashboardJobOffer.published_year <= end_year)
+
+    return statement.group_by(label).order_by(desc(nb_offres)).limit(limit)
 
 
 def salary_breakdown_statement(
@@ -198,23 +140,19 @@ def salary_breakdown_statement(
     filter_values: list[str] | None = None,
     job_titles: list[str] | None = None,
     limit: int = 30,
+    start_year: int | None = None,
+    end_year: int | None = None,
 ) -> Select:
     annual_salary = annual_salary_expression()
     dimension_map = dimension_columns()
-    group_column = dimension_map.get(group_dimension, JobType.title)
-    label = func.coalesce(group_column, "Non renseigné").label("label")
+    group_column = dimension_map.get(group_dimension, DashboardJobOffer.job_title)
+    label = func.coalesce(group_column, MISSING_LABEL).label("label")
     avg_salary = func.round(func.avg(annual_salary), 2).label("avg_salary")
-    nb_offres = func.count(func.distinct(JobOffer.job_id)).cast(Integer).label("nb_offres")
+    nb_offres = func.count(func.distinct(DashboardJobOffer.job_id)).label("nb_offres")
 
     statement = (
         select(label, avg_salary, nb_offres)
-        .outerjoin(Industry, JobOffer.industry_id == Industry.industry_id)
-        .outerjoin(Location, JobOffer.location_id == Location.location_id)
-        .outerjoin(Contract, JobOffer.contract_type_id == Contract.contract_type_id)
-        .outerjoin(JobType, JobOffer.job_type_id == JobType.job_type_id)
-        .outerjoin(Salary, JobOffer.salary_id == Salary.salary_id)
-        .where(JobOffer.published_at.is_not(None))
-        .where((Salary.salary_min.is_not(None) | Salary.salary_max.is_not(None)))
+        .where(DashboardJobOffer.has_salary.is_(True))
         .where(annual_salary.between(MIN_DASHBOARD_ANNUAL_SALARY, MAX_DASHBOARD_ANNUAL_SALARY))
         .where(func.nullif(group_column, "").is_not(None))
     )
@@ -225,48 +163,52 @@ def salary_breakdown_statement(
             statement = statement.where(filter_column.in_(filter_values))
 
     if job_titles:
-        statement = statement.where(JobType.title.in_(job_titles))
+        statement = statement.where(DashboardJobOffer.job_title.in_(job_titles))
 
-    return (
-        statement.group_by(label)
-        .order_by(desc(avg_salary))
-        .limit(limit)
-    )
+    if start_year is not None:
+        statement = statement.where(DashboardJobOffer.published_year >= start_year)
+    if end_year is not None:
+        statement = statement.where(DashboardJobOffer.published_year <= end_year)
+
+    return statement.group_by(label).order_by(desc(avg_salary)).limit(limit)
 
 
 def top_skills_statement(limit: int = 20) -> Select:
-    skill_name = func.coalesce(Skill.skill_name, "Non renseigné").label("skill_name")
-    skill_category = func.coalesce(Skill.skill_category, "Non renseigné").label("skill_category")
-    nb_offres = func.count(func.distinct(JobSkill.job_id)).cast(Integer).label("nb_offres")
-
     return (
-        select(skill_name, skill_category, nb_offres)
-        .join(JobSkill, Skill.skill_id == JobSkill.skill_id)
-        .group_by(skill_name, skill_category)
-        .order_by(desc(nb_offres))
+        select(
+            AggDashboardTopSkill.skill_name,
+            AggDashboardTopSkill.skill_category,
+            AggDashboardTopSkill.nb_offres,
+        )
+        .order_by(desc(AggDashboardTopSkill.nb_offres))
         .limit(limit)
     )
 
 
 def top_advantages_statement(limit: int = 15) -> Select:
-    advantage_name = func.coalesce(Advantage.advantage_name, "Non renseigné").label("advantage_name")
-    nb_offres = func.count(func.distinct(JobAdvantage.job_id)).cast(Integer).label("nb_offres")
-
     return (
-        select(advantage_name, nb_offres)
-        .join(JobAdvantage, Advantage.advantage_id == JobAdvantage.advantage_id)
-        .group_by(advantage_name)
-        .order_by(desc(nb_offres))
+        select(
+            AggDashboardTopAdvantage.advantage_name,
+            AggDashboardTopAdvantage.nb_offres,
+        )
+        .order_by(desc(AggDashboardTopAdvantage.nb_offres))
+        .limit(limit)
+    )
+
+
+def top_companies_statement(limit: int = 20) -> Select:
+    return (
+        select(
+            AggDashboardTopCompany.company_name,
+            AggDashboardTopCompany.nb_offres,
+        )
+        .order_by(desc(AggDashboardTopCompany.nb_offres))
         .limit(limit)
     )
 
 
 def offers_by_source_statement() -> Select:
-    source_system = func.coalesce(JobOffer.primary_source_system, "Non renseigné").label("source_system")
-    nb_offres = func.count().cast(Integer).label("nb_offres")
-
-    return (
-        select(source_system, nb_offres)
-        .group_by(source_system)
-        .order_by(desc(nb_offres))
-    )
+    return select(
+        AggDashboardSource.source_system,
+        AggDashboardSource.nb_offres,
+    ).order_by(desc(AggDashboardSource.nb_offres))

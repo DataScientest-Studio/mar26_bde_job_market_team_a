@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: fact_job_offers
-    description: "Offres canoniques finales, une ligne par offre dedupliquee."
+    description: "Offres canoniques finales, une ligne par offre dedupliquée."
     columns:
       - name: job_id
         tests: [not_null, unique]

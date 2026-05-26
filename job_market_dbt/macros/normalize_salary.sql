@@ -3,12 +3,12 @@
 
 -- Texte salaire standardisé pour les regex
 {% macro salary_text(salary_expression) -%}
-lower(replace(coalesce({{ salary_expression }}, ''), '€', ' eur'))
+lower(replace(replace(coalesce({{ salary_expression }}, ''), '€', ' eur'), 'â‚¬', ' eur'))
 {%- endmacro %}
 
 -- Détecte les salaires en milliers : 44K, 44 k EUR, etc
 {% macro salary_contains_k(salary_expression) -%}
-{{ salary_text(salary_expression) }} ~ '(^|[^a-z0-9])k([^a-z0-9]|$)|\bk\s*(eur|euros)\b'
+{{ salary_text(salary_expression) }} ~ '[0-9]\s*k([^a-z0-9]|$)|\bk\s*(eur|euros)\b'
 {%- endmacro %}
 
 -- Fréquence explicite, avec fallback annuel pour les montants en K

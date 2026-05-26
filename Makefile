@@ -81,7 +81,7 @@ airflow:
 	docker compose up -d --build postgres pipeline airflow-postgres airflow-init airflow-webserver airflow-scheduler
 
 ml-train:
-	$(PYTHON) -m src.models.train_models --model-dir $(MODEL_DIR) --n-neighbors $(ML_NEIGHBORS)
+	$(PYTHON) -m src.models.train_models --model-dir $(MODEL_DIR)
 
 ml-check:
 	$(PYTHON) -m compileall src
