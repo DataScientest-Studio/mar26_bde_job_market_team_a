@@ -38,6 +38,13 @@ Le pipeline suit ce flux :
 - couche produit : API FastAPI
 
 ## Collecte
+La collecte s'effectue à partir d'un script principal qui va appeler deux autres scripts chacun utilisant une méthode d'extraction de données différente.
+
+La première va aller effectuer des requêtes à l'API de France Travail pour pouvoir obtenir des données brutes par batch de 150 éléments. On va se baser sur des fichiers de référence comme les codes de départements pour affiner la recherche, ou encore les codes de régions pour regrouper les éléments requêtés par régions dans le .json généré.
+
+La seconde va aller effectuer un scraping du site Welcome To The Jungle à partir d'un lien d'entrée (pas la page d'accueil, car suite à une màj de leur site fin avril, une authentification est nécessaire pour effectuer des recherches personnalisées). En passant par ce lien, qui liste des pages de recherches prédéfinies, rangées par régions, on effectue un scraping récursif de chaque offre contenue dans chaque page de recherche au travers d'un driver Selenium transversal.
+
+Ces deux étapes génèrent à des fichiers .json de données brutes qui vont transiter vers les étapes de stockage et de traitement des données.
 
 Le script principal de collecte est :
 
@@ -55,6 +62,8 @@ Les référentiels et fichiers de suivi de collecte sont ici :
 - [references/data_extraction/france_travail/region_codes.json](references/data_extraction/france_travail/region_codes.json)
 - [references/data_extraction/welcome_to_the_jungle/webscraping_metadata.yml](references/data_extraction/welcome_to_the_jungle/webscraping_metadata.yml)
 
+Le lien d'entrée Welcome To the Jungle se trouve ici :
+[https://www.welcometothejungle.com/fr/pages/offres-emploi-par-metiers-villes]
 
 ## Stockage
 
